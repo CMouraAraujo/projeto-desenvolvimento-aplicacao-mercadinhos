@@ -191,3 +191,47 @@ Invoke-WebRequest "$api/api/auth/logout" -Method Post -WebSession $navegador `
 - Caffeine limita tentativas de login a 30 por IP em uma janela de 15 minutos, com cache limitado a 10 mil entradas. Ao exceder, responde 429 com Retry-After. Contam tentativas válidas e inválidas que passaram pelo CSRF.
 - Sessões e limitador são locais a uma instância e se perdem ao reiniciar. Implantação em múltiplas instâncias exige solução compartilhada e proteção na borda. O IP considerado é o da conexão direta; cabeçalhos de proxy não são confiados automaticamente.
 - Ainda não há recuperação de senha, convites por e-mail, MFA, painel de administração, permissões por módulo ou trilha completa de auditoria de acesso. Essas funcionalidades e a configuração do ambiente precisam ser concluídas antes de oferecer o serviço a clientes reais.
+
+## Swagger / OpenAPI no ambiente local
+
+Inicie o backend com o perfil local e abra:
+
+- Interface: http://localhost:8080/swagger-ui/index.html
+- Especificação JSON: http://localhost:8080/v3/api-docs
+
+No Windows, se a política de execução bloquear o script PowerShell, use o Maven Wrapper diretamente na raiz do projeto:
+
+```powershell
+$env:JAVA_HOME = 'C:\Program Files\Java\jdk-22'
+.\backend\mvnw.cmd -f .\backend\pom.xml spring-boot:run "-Dspring-boot.run.profiles=local"
+```
+
+Ajuste JAVA_HOME ao JDK instalado na sua máquina. Para executar os testes sem o script:
+
+```powershell
+.\backend\mvnw.cmd -f .\backend\pom.xml -B -ntp verify
+```
+
+Se já houver uma instância rodando na porta 8080, encerre-a com Ctrl+C no terminal correspondente e reinicie para carregar esta alteração. O Swagger é servido pelo próprio backend; não usa outra porta nem um contêiner separado.
+
+### Testar pelo navegador
+
+1. Crie seu administrador pelo provisionamento, caso ainda não exista.
+2. No Swagger, abra GET /api/auth/csrf, clique em Try it out e Execute.
+3. Copie somente o valor de token da resposta. Abra Authorize e cole em csrf.
+4. Execute POST /api/auth/login com os campos email e senha. O retorno de sucesso é 204; o navegador recebe e guarda o cookie de sessão automaticamente.
+5. Execute GET /api/auth/me e GET /api/organizacao para conferir o acesso.
+6. Execute novamente GET /api/auth/csrf depois do login. Em Authorize, remova o valor anterior de csrf e informe o novo token.
+7. Execute POST /api/auth/logout. A sessão termina com 204. Depois, GET /api/auth/me deve retornar 401.
+
+O campo sessao em Authorize documenta o cookie JSESSIONID; não precisa ser preenchido e não substitui o login. Cookies HttpOnly são gerenciados pelo navegador. Login e logout continuam exigindo CSRF: a documentação não desativa a proteção.
+
+Autorizações do Swagger não são persistidas entre recargas. O token deve ser atualizado após login e logout. Se a sessão expirar, obtenha novo token e entre novamente. Não use credenciais reais de produção nesta interface local.
+
+### Restrição de acesso à documentação
+
+Springdoc 3.2.0 fornece os modelos OpenAPI e o Swagger UI. A documentação está desativada por padrão e habilitada no application-local.properties. Além disso, Spring Security só libera os GETs das rotas da documentação quando o perfil local está ativo.
+
+Fora do perfil local, as rotas continuam bloqueadas inclusive para administradores. Ativar propriedades do Springdoc isoladamente não libera o acesso pela segurança. Não ative o perfil local em produção.
+
+Os testes verificam o contrato documentado, o formulário de login, os endpoints tratados por filtros, os recursos da interface e a restrição por ambiente. Login, logout e provisão não são duplicados em controladores fictícios apenas para aparecer no Swagger.

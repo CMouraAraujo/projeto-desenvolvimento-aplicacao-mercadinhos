@@ -3,6 +3,8 @@ package br.com.mercadinhos.identidade.internal;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnWebApplication;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.core.env.Environment;
+import org.springframework.core.env.Profiles;
 import org.springframework.http.HttpMethod;
 import org.springframework.http.HttpStatus;
 import org.springframework.security.config.Customizer;
@@ -16,13 +18,19 @@ import org.springframework.security.web.access.intercept.AuthorizationFilter;
 @ConditionalOnWebApplication(type = ConditionalOnWebApplication.Type.SERVLET)
 class ConfiguracaoSeguranca {
     @Bean
-    SecurityFilterChain securityFilterChain(HttpSecurity http, AutenticacaoService autenticacao) throws Exception {
+    SecurityFilterChain securityFilterChain(HttpSecurity http, AutenticacaoService autenticacao, Environment environment) throws Exception {
         return http
-                .authorizeHttpRequests(authorize -> authorize
+                .authorizeHttpRequests(authorize -> {
+                    if (environment.acceptsProfiles(Profiles.of("local"))) {
+                        authorize.requestMatchers(HttpMethod.GET, "/swagger-ui.html", "/swagger-ui/**",
+                                "/v3/api-docs", "/v3/api-docs/**", "/v3/api-docs.yaml").permitAll();
+                    }
+                    authorize
                         .requestMatchers(HttpMethod.GET, "/actuator/health", "/api/auth/csrf").permitAll()
                         .requestMatchers(HttpMethod.POST, "/api/auth/login").permitAll()
                         .requestMatchers(HttpMethod.GET, "/api/auth/me", "/api/organizacao").authenticated()
-                        .anyRequest().denyAll())
+                        .anyRequest().denyAll();
+                })
                 .exceptionHandling(exceptions -> exceptions
                         .authenticationEntryPoint((request, response, exception) ->
                                 response.setStatus(HttpStatus.UNAUTHORIZED.value()))

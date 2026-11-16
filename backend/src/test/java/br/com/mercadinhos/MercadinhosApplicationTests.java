@@ -98,6 +98,21 @@ class MercadinhosApplicationTests {
                 assertThat(cookie).contains("HttpOnly", "Secure", "SameSite=Lax", "Path=/"));
     }
 
+    @Test
+    void documentacaoPermaneceBloqueadaSemPerfilLocal() throws Exception {
+        for (String endpoint : new String[] {"/swagger-ui.html", "/swagger-ui/index.html", "/v3/api-docs", "/v3/api-docs.yaml", "/v3/api-docs/swagger-config"}) {
+            assertThat(get(endpoint).statusCode()).as(endpoint).isEqualTo(401);
+        }
+    }
+
+    @Test
+    @WithMockUser(roles = "ADMIN")
+    void administradorTambemNaoAcessaDocumentacaoForaDoPerfilLocal() throws Exception {
+        for (String endpoint : new String[] {"/swagger-ui/index.html", "/v3/api-docs"}) {
+            mockMvc.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get(endpoint))
+                    .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.status().isForbidden());
+        }
+    }
     private HttpResponse<String> get(String endpoint) throws Exception {
         return client.send(HttpRequest.newBuilder(URI.create("http://localhost:" + port + endpoint))
                 .GET().build(), HttpResponse.BodyHandlers.ofString());
