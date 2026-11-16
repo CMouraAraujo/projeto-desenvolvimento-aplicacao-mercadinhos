@@ -10,9 +10,21 @@ import jakarta.persistence.Id;
 import jakarta.persistence.Table;
 import jakarta.persistence.Version;
 
+import lombok.AccessLevel;
+import lombok.Getter;
+import lombok.NoArgsConstructor;
+
+@Getter
+@NoArgsConstructor(access = AccessLevel.PROTECTED)
 @Entity
 @Table(name = "organizacoes")
 public class Organizacao {
+    Organizacao(String nome) {
+        this.nome = nome;
+        this.criadoEm = Instant.now();
+        this.atualizadoEm = this.criadoEm;
+    }
+
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
@@ -33,6 +45,4 @@ public class Organizacao {
     @Column(nullable = false)
     private long versao;
 
-    protected Organizacao() {
-    }
 }

@@ -1,6 +1,6 @@
 [CmdletBinding()]
 param(
-    [ValidateSet('run', 'verify', 'package')]
+    [ValidateSet('run', 'verify', 'package', 'provision')]
     [string]$Task = 'run'
 )
 
@@ -28,8 +28,16 @@ try {
         } else {
             $mavenArguments += $Task
         }
-        & (Join-Path $projectRoot 'backend/mvnw.cmd') @mavenArguments
-        if ($LASTEXITCODE -ne 0) { throw "Maven terminou com codigo $LASTEXITCODE." }
+        if ($Task -eq 'provision') {
+            $jar = Join-Path $projectRoot 'backend/target/mercadinhos-api-0.0.1-SNAPSHOT.jar'
+            if (-not (Test-Path -LiteralPath $jar)) {
+                throw 'Execute .\scripts\backend.ps1 verify antes de provisionar.'
+            }
+            & (Join-Path $env:JAVA_HOME 'bin/java.exe') -jar $jar '--spring.profiles.active=local,provisionamento'
+        } else {
+            & (Join-Path $projectRoot 'backend/mvnw.cmd') @mavenArguments
+        }
+        if ($LASTEXITCODE -ne 0) { throw "Comando terminou com codigo $LASTEXITCODE." }
     } finally {
         Pop-Location
     }
