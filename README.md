@@ -8,7 +8,7 @@ Aplicação modular para redes de minimercados de autoatendimento. Cada empresa 
 
 Backend com Spring Boot, MySQL, Flyway e validação do schema. Já oferece provisionamento local de organização e administrador, login por sessão, consulta da conta e da organização atual e logout.
 
-O contexto da organização vem da sessão autenticada e é revalidado no banco. Ainda não há gestão de funcionários, permissões por módulo, recuperação de senha, API de produtos ou interface web. Esta é a primeira entrega de identidade; os limites de produção estão descritos abaixo.
+O contexto da organização vem da sessão autenticada e é revalidado no banco. Já há gestão de funcionários e permissões por módulo/ação, restritas à organização do administrador. Ainda não há recuperação de senha, API de produtos ou interface web. Esta é a primeira entrega de identidade; os limites de produção estão descritos abaixo.
 
 ## Tecnologias
 
@@ -114,7 +114,7 @@ docker compose stop mysql
 
 ## Próximas entregas
 
-1. Gestão de funcionários, permissões por módulo e recuperação segura de acesso.
+1. Recuperação segura de acesso e troca da senha inicial, antes do uso em produção.
 2. Categorias isoladas por organização.
 3. API e modal de produtos, com código de barras obrigatório e único por organização.
 4. Vínculo com mercadinhos e demais módulos conforme a Wiki.
@@ -125,7 +125,7 @@ Branches seguem feature/, bugfix/, hotfix/, chore/, refactor/ ou docs/. A branch
 
 Bibliotecas são escolhidas conforme o problema: Spring Security, Bean Validation, Spring Data JPA, Flyway, Lombok, Caffeine, JUnit, AssertJ e Testcontainers já compõem a base. Lombok usa processamento de anotações explícito no Maven, com getters e construtor protegido na entidade; setters não são liberados indiscriminadamente.
 
-O CI executa os testes, e o Dependabot está configurado para propor atualizações Maven e GitHub Actions. Os testes atuais também verificam CSRF, cabeçalhos de segurança e bloqueio de usuários autenticados enquanto as funcionalidades de negócio ainda não foram liberadas.
+O CI executa os testes, e o Dependabot está configurado para propor atualizações Maven e GitHub Actions. Os testes verificam CSRF, cabeçalhos de segurança, isolamento de usuários por organização, autorização por ação, revogação de sessão e concorrência. As rotas de catálogo ainda não foram liberadas.
 
 As convenções para futuras alterações estão em [AGENTS.md](AGENTS.md). Testes de isolamento entre organizações e de permissões serão obrigatórios nas entregas das APIs correspondentes; a autenticação de sessão já está implementada; as permissões dos módulos serão acrescentadas com suas respectivas APIs.
 
@@ -190,7 +190,7 @@ Invoke-WebRequest "$api/api/auth/logout" -Method Post -WebSession $navegador `
 - Não há seleção de organização pelo navegador: parâmetro ou cabeçalho fornecido pelo cliente não muda o contexto autenticado.
 - Caffeine limita tentativas de login a 30 por IP em uma janela de 15 minutos, com cache limitado a 10 mil entradas. Ao exceder, responde 429 com Retry-After. Contam tentativas válidas e inválidas que passaram pelo CSRF.
 - Sessões e limitador são locais a uma instância e se perdem ao reiniciar. Implantação em múltiplas instâncias exige solução compartilhada e proteção na borda. O IP considerado é o da conexão direta; cabeçalhos de proxy não são confiados automaticamente.
-- Ainda não há recuperação de senha, convites por e-mail, MFA, painel de administração, permissões por módulo ou trilha completa de auditoria de acesso. Essas funcionalidades e a configuração do ambiente precisam ser concluídas antes de oferecer o serviço a clientes reais.
+- Ainda não há recuperação de senha, convites por e-mail, MFA, painel visual de administração ou trilha completa de auditoria de acesso. Essas funcionalidades e a configuração do ambiente precisam ser concluídas antes de oferecer o serviço a clientes reais.
 
 ## Swagger / OpenAPI no ambiente local
 
@@ -235,3 +235,66 @@ Springdoc 3.2.0 fornece os modelos OpenAPI e o Swagger UI. A documentação est�
 Fora do perfil local, as rotas continuam bloqueadas inclusive para administradores. Ativar propriedades do Springdoc isoladamente não libera o acesso pela segurança. Não ative o perfil local em produção.
 
 Os testes verificam o contrato documentado, o formulário de login, os endpoints tratados por filtros, os recursos da interface e a restrição por ambiente. Login, logout e provisão não são duplicados em controladores fictícios apenas para aparecer no Swagger.
+
+## Funcionários e permissões
+
+Somente administradores gerenciam usuários. A organização é inferida da sessão; nunca é escolhida no JSON, em query strings ou cabeçalhos. O cadastro via API sempre cria FUNCIONARIO, sem promoção para ADMIN. Campos não suportados, como papel, id ou organizacaoId, são rejeitados com 400.
+
+| Método | Rota | Acesso e finalidade |
+| --- | --- | --- |
+| GET | /api/usuarios?pagina=0&tamanho=20 | Admin: lista usuários da organização, inclusive administradores |
+| GET | /api/usuarios/{id} | Admin: consulta usuário da própria organização |
+| POST | /api/usuarios | Admin + CSRF: cria funcionário |
+| PUT | /api/usuarios/{id}/permissoes | Admin + CSRF: substitui integralmente as permissões do funcionário |
+| PATCH | /api/usuarios/{id}/situacao | Admin + CSRF: ativa ou desativa funcionário |
+| GET | /api/modulos | Admin: lista módulos e ações disponíveis |
+| GET | /api/auth/permissoes | Autenticado: consulta as próprias permissões efetivas |
+
+Módulo inicial: PRODUTOS. Ações: CONSULTAR, CADASTRAR, EDITAR e INATIVAR. Qualquer ação além de CONSULTAR exige também CONSULTAR no mesmo módulo. Lista vazia significa nenhum acesso. Administradores têm acesso completo aos módulos conhecidos, sem precisar gravar permissões individuais. Isso não libera gestão de usuários aos funcionários.
+
+### Exemplo no Swagger
+
+Entre como administrador e atualize o token CSRF em Authorize, conforme o fluxo de autenticação acima. Em POST /api/usuarios, envie:
+
+```json
+{
+  "nome": "Funcionário de cadastro",
+  "email": "funcionario@example.com",
+  "senha": "DefinaUmaSenhaInicialForte",
+  "permissoes": [
+    { "modulo": "PRODUTOS", "acao": "CONSULTAR" },
+    { "modulo": "PRODUTOS", "acao": "CADASTRAR" }
+  ]
+}
+```
+
+O exemplo de senha é apenas ilustrativo. Defina uma senha exclusiva e entregue-a por canal seguro. Convites e troca obrigatória de senha inicial ainda serão implementados; não ofereça este fluxo a clientes reais antes dessas etapas.
+
+O retorno 201 contém o ID, a versão, os dados públicos e as permissões; nunca contém senha ou hash. O e-mail é globalmente único nesta versão, pois uma conta pertence a uma organização. Conflitos retornam 409 sem expor detalhes de outra empresa.
+
+Para substituir permissões, consulte primeiro GET /api/usuarios/{id} e use a versão retornada:
+
+```json
+{
+  "versao": 0,
+  "permissoes": [
+    { "modulo": "PRODUTOS", "acao": "CONSULTAR" }
+  ]
+}
+```
+
+Para desativar, envie ao PATCH /api/usuarios/{id}/situacao:
+
+```json
+{ "versao": 0, "ativo": false }
+```
+
+Substitua 0 pela versão atual em cada operação. Uma alteração incrementa a versão do vínculo, revogando sessões anteriores na próxima requisição. O funcionário precisa entrar novamente para usar as novas permissões. Uma versão desatualizada retorna 409; releia o cadastro antes de tentar novamente. Operações simultâneas usam bloqueio de linha e comparação da versão para impedir sobrescritas silenciosas.
+
+A paginação aceita pagina >= 0 e tamanho de 1 a 100. Usuários de outra organização retornam o mesmo 404 de um ID inexistente. Funcionários recebem 403 ao tentar gerenciar usuários, mesmo que tentem alterar a própria conta. A API não permite desativar ou editar permissões de administradores, protegendo o acesso administrativo da organização.
+
+### Integração dos próximos módulos
+
+O contrato público identidade.AcessoAtual permite exigir uma ação e obter a organização validada. Cada operação de negócio deverá chamar exigir(Modulo.PRODUTOS, Acao correspondente) e restringir suas consultas pelo organizacaoId() retornado. Os testes já exercitam esse contrato; a API de produtos e a interface visual ainda serão construídas.
+
+A migração V3 cria as permissões vinculadas ao usuário da organização e adiciona o versionamento dos vínculos. Migrações anteriores foram preservadas. Reinicie o backend para aplicar a migração automaticamente; não é necessário executar SQL manualmente.

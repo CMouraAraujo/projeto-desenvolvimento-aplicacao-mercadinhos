@@ -11,6 +11,7 @@ final class SessaoUsuario extends User {
     private final Long usuarioId;
     private final Long organizacaoId;
     private final long versaoUsuario;
+    private final long versaoVinculo;
     private final Papel papel;
 
     SessaoUsuario(VinculoOrganizacao vinculo) {
@@ -22,5 +23,6 @@ final class SessaoUsuario extends User {
         organizacaoId = vinculo.getOrganizacao().getId();
         versaoUsuario = vinculo.getUsuario().getVersao();
         papel = vinculo.getPapel();
+        versaoVinculo = vinculo.getVersao();
     }
 }

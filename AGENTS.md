@@ -4,7 +4,7 @@
 
 - Usar branches com prefixos feature/, bugfix/, hotfix/, chore/, refactor/ ou docs/, conforme a alteração.
 - Não usar o prefixo codex/.
-- Preservar alterações do usuário. Não fazer commit ou push sem solicitação.
+- Preservar alterações do usuário. O usuário executa git add, commit, push e merge manualmente; fornecer somente orientações e comandos para essas ações.
 
 ## Bibliotecas e arquitetura
 

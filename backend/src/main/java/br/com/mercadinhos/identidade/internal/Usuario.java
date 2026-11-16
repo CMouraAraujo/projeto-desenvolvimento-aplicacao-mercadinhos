@@ -23,6 +23,8 @@ class Usuario {
     @Version
     private long versao;
 
+    void alterarSituacao(boolean ativo) { this.ativo = ativo; }
+
     Usuario(String email, String nome, String senhaHash) {
         this.email = email;
         this.nome = nome;

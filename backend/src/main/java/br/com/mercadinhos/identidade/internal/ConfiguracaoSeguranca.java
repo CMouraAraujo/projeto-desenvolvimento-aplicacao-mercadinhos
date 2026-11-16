@@ -28,7 +28,8 @@ class ConfiguracaoSeguranca {
                     authorize
                         .requestMatchers(HttpMethod.GET, "/actuator/health", "/api/auth/csrf").permitAll()
                         .requestMatchers(HttpMethod.POST, "/api/auth/login").permitAll()
-                        .requestMatchers(HttpMethod.GET, "/api/auth/me", "/api/organizacao").authenticated()
+                        .requestMatchers(HttpMethod.GET, "/api/auth/me", "/api/organizacao", "/api/auth/permissoes").authenticated()
+                        .requestMatchers("/api/usuarios", "/api/usuarios/**", "/api/modulos").hasRole("ADMIN")
                         .anyRequest().denyAll();
                 })
                 .exceptionHandling(exceptions -> exceptions

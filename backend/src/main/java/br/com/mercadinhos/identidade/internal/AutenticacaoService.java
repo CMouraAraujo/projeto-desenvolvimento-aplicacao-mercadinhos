@@ -28,6 +28,7 @@ class AutenticacaoService implements UserDetailsService {
                 .filter(v -> v.getOrganizacao().getId().equals(sessao.getOrganizacaoId()))
                 .filter(v -> v.getPapel() == sessao.getPapel())
                 .filter(v -> v.getUsuario().getVersao() == sessao.getVersaoUsuario())
+                .filter(v -> v.getVersao() == sessao.getVersaoVinculo())
                 .isPresent();
     }
 }

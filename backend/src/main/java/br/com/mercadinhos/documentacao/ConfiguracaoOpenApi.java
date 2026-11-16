@@ -66,6 +66,15 @@ class ConfiguracaoOpenApi {
                     .responses(new ApiResponses()
                             .addApiResponse("204", resposta("Sessão encerrada"))
                             .addApiResponse("403", resposta("Token CSRF ausente ou inválido")))));
+            api.getPaths().forEach((caminho, item) -> {
+                if (caminho.startsWith("/api/usuarios")) {
+                    for (var operacao : java.util.Arrays.asList(item.getPost(), item.getPut(), item.getPatch())) {
+                        if (operacao != null) {
+                            operacao.setSecurity(List.of(new SecurityRequirement().addList("sessao").addList("csrf")));
+                        }
+                    }
+                }
+            });
             var csrf = api.getPaths().get("/api/auth/csrf");
             if (csrf != null && csrf.getGet() != null) { csrf.getGet().setSecurity(List.of()); }
         };
