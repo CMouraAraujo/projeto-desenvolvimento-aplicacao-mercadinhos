@@ -1,0 +1,15 @@
+# Secrets and local configuration
+.env
+.env.*
+!.env.example
+*.log
+# Build and editors
+**/target/
+**/node_modules/
+**/dist/
+.idea/
+.vscode/
+*.iml
+.DS_Store
+# Local copy of the separate GitHub Wiki
+/..projeto-sistema-minimercado-wiki/
