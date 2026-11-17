@@ -86,8 +86,8 @@ class MercadinhosApplicationTests {
 
     @Test
     @WithMockUser(roles = "ADMIN")
-    void authenticatedUsersStillCannotAccessBusinessRoutesBeforeAuthorizationIsImplemented() throws Exception {
-        mockMvc.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get("/api/produtos"))
+    void authenticatedUsersCannotAccessUnimplementedModules() throws Exception {
+        mockMvc.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get("/api/compras"))
                 .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.status().isForbidden());
     }
     @Test

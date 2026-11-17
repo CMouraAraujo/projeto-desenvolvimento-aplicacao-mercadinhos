@@ -8,7 +8,7 @@ Aplicação modular para redes de minimercados de autoatendimento. Cada empresa 
 
 Backend com Spring Boot, MySQL, Flyway e validação do schema. Já oferece provisionamento local de organização e administrador, login por sessão, consulta da conta e da organização atual e logout.
 
-O contexto da organização vem da sessão autenticada e é revalidado no banco. Já há gestão de funcionários e permissões por módulo/ação, restritas à organização do administrador. Ainda não há recuperação de senha, API de produtos ou interface web. Esta é a primeira entrega de identidade; os limites de produção estão descritos abaixo.
+O contexto da organização vem da sessão autenticada e é revalidado no banco. Já há gestão de funcionários, permissões por módulo/ação e categorias, restritas à organização do cliente. Já há API de produtos com imagens e dados fiscais opcionais. Ainda não há recuperação de senha ou interface web. Esta é a primeira entrega de identidade; os limites de produção estão descritos abaixo.
 
 ## Tecnologias
 
@@ -24,7 +24,7 @@ O contexto da organização vem da sessão autenticada e é revalidado no banco.
 backend/                  API e testes
   src/main/java/br/com/mercadinhos/
     identidade/           Organizações e segurança
-    catalogo/             Limite reservado ao futuro catálogo
+    catalogo/             Categorias e futuro cadastro de produtos
   src/main/resources/db/migration/
 frontend/                 Reservado; interface ainda não implementada
 scripts/backend.ps1       Execução e verificação no Windows
@@ -115,8 +115,8 @@ docker compose stop mysql
 ## Próximas entregas
 
 1. Recuperação segura de acesso e troca da senha inicial, antes do uso em produção.
-2. Categorias isoladas por organização.
-3. API e modal de produtos, com código de barras obrigatório e único por organização.
+2. Validação do fluxo de cadastro pela interface web.
+3. Interface com listagem e modal de produtos, com código de barras obrigatório e único por organização.
 4. Vínculo com mercadinhos e demais módulos conforme a Wiki.
 
 ## Convenções de desenvolvimento
@@ -125,7 +125,7 @@ Branches seguem feature/, bugfix/, hotfix/, chore/, refactor/ ou docs/. A branch
 
 Bibliotecas são escolhidas conforme o problema: Spring Security, Bean Validation, Spring Data JPA, Flyway, Lombok, Caffeine, JUnit, AssertJ e Testcontainers já compõem a base. Lombok usa processamento de anotações explícito no Maven, com getters e construtor protegido na entidade; setters não são liberados indiscriminadamente.
 
-O CI executa os testes, e o Dependabot está configurado para propor atualizações Maven e GitHub Actions. Os testes verificam CSRF, cabeçalhos de segurança, isolamento de usuários por organização, autorização por ação, revogação de sessão e concorrência. As rotas de catálogo ainda não foram liberadas.
+O CI executa os testes, e o Dependabot está configurado para propor atualizações Maven e GitHub Actions. Os testes verificam CSRF, cabeçalhos de segurança, isolamento de usuários por organização, autorização por ação, revogação de sessão e concorrência. As APIs de categorias e produtos estão disponíveis, com autorização por ação e isolamento por organização.
 
 As convenções para futuras alterações estão em [AGENTS.md](AGENTS.md). Testes de isolamento entre organizações e de permissões serão obrigatórios nas entregas das APIs correspondentes; a autenticação de sessão já está implementada; as permissões dos módulos serão acrescentadas com suas respectivas APIs.
 
@@ -295,6 +295,71 @@ A paginação aceita pagina >= 0 e tamanho de 1 a 100. Usuários de outra organi
 
 ### Integração dos próximos módulos
 
-O contrato público identidade.AcessoAtual permite exigir uma ação e obter a organização validada. Cada operação de negócio deverá chamar exigir(Modulo.PRODUTOS, Acao correspondente) e restringir suas consultas pelo organizacaoId() retornado. Os testes já exercitam esse contrato; a API de produtos e a interface visual ainda serão construídas.
+O contrato público identidade.AcessoAtual permite exigir uma ação e obter a organização validada. Cada operação de negócio deve exigir a ação correspondente e restringir suas consultas pelo organizacaoId() retornado. Categorias já utiliza esse contrato; a API de produtos já está implementada e a interface visual será construída em etapa posterior.
 
 A migração V3 cria as permissões vinculadas ao usuário da organização e adiciona o versionamento dos vínculos. Migrações anteriores foram preservadas. Reinicie o backend para aplicar a migração automaticamente; não é necessário executar SQL manualmente.
+
+## Categorias
+
+O catálogo já possui categorias por organização. Sua manutenção é exclusiva de administradores, conforme o escopo inicial. Funcionários com PRODUTOS/CONSULTAR podem listar e consultar; as permissões CADASTRAR, EDITAR e INATIVAR de Produtos não concedem manutenção de categorias a funcionários.
+
+| Método | Rota | Finalidade |
+| --- | --- | --- |
+| GET | /api/categorias | Listagem paginada, busca por nome e filtro de situação |
+| GET | /api/categorias/{id} | Consulta de categoria da própria organização |
+| POST | /api/categorias | Cadastro pelo administrador |
+| PUT | /api/categorias/{id} | Edição do nome, com versão atual |
+| PATCH | /api/categorias/{id}/situacao | Inativação ou reativação, com versão atual |
+
+Todas as rotas exigem sessão. Alterações exigem token CSRF e administrador. Os serviços verificam também a ação correspondente no módulo Produtos, usando apenas o contrato público de identidade; o catálogo não depende das entidades ou repositórios internos de usuários.
+
+### Regras
+
+- Nome obrigatório, com no máximo 100 caracteres na entrada. Espaços repetidos, espaços não separáveis e espaços nas extremidades são normalizados. Texto Unicode é armazenado em forma NFC.
+- Nome único por organização, sem diferenciar maiúsculas/minúsculas ou acentos. Exemplo: Café e cafe representam o mesmo nome para a unicidade. A restrição existe no MySQL para proteger também cadastros simultâneos.
+- Organizações diferentes podem utilizar o mesmo nome. Categorias inativas continuam reservando o nome; reative o cadastro existente em vez de criar uma duplicata.
+- Categorias são criadas ativas e não possuem exclusão física nesta API. Seus IDs e datas de criação são preservados na edição.
+- O cliente não escolhe organização, ID, situação inicial ou versão no cadastro. Campos não suportados são rejeitados.
+- Consultar ou alterar um ID de outra organização retorna o mesmo 404 de um ID inexistente.
+- Edição e situação exigem a versão retornada na consulta. Versão desatualizada retorna 409. Alterações simultâneas usam bloqueio de linha e comparação da versão.
+- No futuro cadastro de produtos, categorias inativas permanecerão nos vínculos existentes e não poderão ser escolhidas para novos vínculos. Essa regra de associação será implementada junto com os produtos.
+
+### Testar pelo Swagger
+
+Reinicie o backend no perfil local para aplicar a migração V4. Entre como administrador e atualize o token CSRF em Authorize. Em POST /api/categorias, envie:
+
+```json
+{ "nome": "Bebidas" }
+```
+
+O retorno 201 inclui id, nome, ativa, versao, criadoEm e atualizadoEm. Para editar pelo PUT /api/categorias/{id}:
+
+```json
+{ "versao": 0, "nome": "Bebidas não alcoólicas" }
+```
+
+Para inativar pelo PATCH /api/categorias/{id}/situacao:
+
+```json
+{ "versao": 1, "ativa": false }
+```
+
+Use a versão efetivamente retornada em cada operação, em vez de assumir os valores dos exemplos. Para reativar, envie ativa=true com a versão atual.
+
+Exemplo de consulta: GET /api/categorias?pagina=0&tamanho=20&busca=bebidas&ativa=true. Sem filtro ativa, a listagem inclui ativas e inativas. A busca é por trecho literal: % e _ não funcionam como curingas. Paginação: pagina >= 0 e tamanho de 1 a 100; busca de até 100 caracteres.
+
+A migração V4 preserva as anteriores e cria a tabela categorias com vínculo à organização, unicidade, situação, versão e datas. Erros de validação e conflitos de banco são tratados pela camada web compartilhada, sem expor SQL ou valores sensíveis.
+
+## API de produtos e integração do frontend
+
+A API já permite cadastrar, consultar, listar, editar, inativar e reativar produtos, além de enviar/remover uma imagem. Dados fiscais são opcionais e têm validação de formato, sem cálculo tributário nem homologação de enquadramento.
+
+O contrato completo, exemplos JSON, permissões, edição, upload e orientações para o novo chat estão em [Integração do frontend](docs/integracao-frontend.md). A fonte executável do contrato é o Swagger/OpenAPI local. MapStruct gera o mapeamento dos produtos para DTOs, integrado ao Lombok no compilador.
+
+A migração V5 cria produtos e uma chave estrangeira composta que impede associar categoria de outra organização também no banco. Código de barras obrigatório e único por organização, inclusive em produtos inativos. Categorias inativas podem permanecer em vínculos existentes, mas não receber novas associações. Os dados de negócio são separados de estoque, preços e disponibilidade por mercadinho.
+
+Imagens ficam fora do banco. Configure PRODUCT_IMAGES_DIR com um diretório absoluto para armazenamento persistente; o padrão é ${user.home}/.mercadinhos/imagens, resolvido pelo Java. Apenas referências internas são salvas no produto. Não exponha esse diretório como conteúdo estático público. Faça backup do banco e desse diretório em conjunto. Em várias instâncias, use armazenamento compartilhado ou uma implementação de armazenamento de objetos.
+
+Substituição e remoção limpam arquivos antigos depois do commit; rollback remove o arquivo recém-enviado e preserva o anterior. Uma interrupção abrupta do processo pode deixar arquivos órfãos, exigindo reconciliação operacional; essa implementação local não promete transação distribuída entre MySQL e filesystem.
+
+Reinicie o backend para aplicar a V5 e abrir os novos endpoints no Swagger. Para o frontend, recomenda-se concluir e integrar primeiro os commits de categorias e produtos; depois usar um novo chat com branch própria. Se houver desenvolvimento simultâneo, utilizar checkouts separados.

@@ -1,2 +1,2 @@
-/** Catalogo da organizacao: produtos e categorias. Implementacao em etapa posterior. */
+/** Catálogo da organização: categorias e, futuramente, produtos. */
 package br.com.mercadinhos.catalogo;

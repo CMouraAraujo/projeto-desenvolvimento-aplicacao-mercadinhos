@@ -19,6 +19,9 @@ class ContextoAcesso implements AcessoAtual {
     public Long organizacaoId() { return vinculoAtual().getOrganizacao().getId(); }
 
     @Override
+    public Long usuarioId() { return vinculoAtual().getUsuario().getId(); }
+
+    @Override
     public void exigir(Modulo modulo, Acao acao) {
         var vinculo = vinculoAtual();
         if (modulo == null || acao == null || (vinculo.getPapel() != Papel.ADMIN

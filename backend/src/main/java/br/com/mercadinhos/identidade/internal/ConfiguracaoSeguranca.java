@@ -30,6 +30,15 @@ class ConfiguracaoSeguranca {
                         .requestMatchers(HttpMethod.POST, "/api/auth/login").permitAll()
                         .requestMatchers(HttpMethod.GET, "/api/auth/me", "/api/organizacao", "/api/auth/permissoes").authenticated()
                         .requestMatchers("/api/usuarios", "/api/usuarios/**", "/api/modulos").hasRole("ADMIN")
+                        .requestMatchers(HttpMethod.GET, "/api/categorias", "/api/categorias/*").authenticated()
+                        .requestMatchers(HttpMethod.POST, "/api/categorias").hasRole("ADMIN")
+                        .requestMatchers(HttpMethod.PUT, "/api/categorias/*").hasRole("ADMIN")
+                        .requestMatchers(HttpMethod.PATCH, "/api/categorias/*/situacao").hasRole("ADMIN")
+                        .requestMatchers(HttpMethod.GET, "/api/produtos", "/api/produtos/*", "/api/produtos/por-codigo/*", "/api/produtos/*/imagem").authenticated()
+                        .requestMatchers(HttpMethod.POST, "/api/produtos").authenticated()
+                        .requestMatchers(HttpMethod.PUT, "/api/produtos/*", "/api/produtos/*/imagem").authenticated()
+                        .requestMatchers(HttpMethod.PATCH, "/api/produtos/*/situacao").authenticated()
+                        .requestMatchers(HttpMethod.DELETE, "/api/produtos/*/imagem").authenticated()
                         .anyRequest().denyAll();
                 })
                 .exceptionHandling(exceptions -> exceptions
