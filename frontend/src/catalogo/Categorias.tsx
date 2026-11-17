@@ -1,0 +1,67 @@
+import { useState } from 'react'
+import { useForm } from 'react-hook-form'
+import { zodResolver } from '@hookform/resolvers/zod'
+import { z } from 'zod'
+import { useQuery, useQueryClient } from '@tanstack/react-query'
+import { useAuth } from '../auth/Auth'
+import type { Categoria } from '../shared/types'
+import { Badge, Empty, ErrorNotice, Field, Icon, Loading, Modal, Pagination } from '../shared/ui'
+import { catalogo } from './api'
+import { request } from '../shared/api'
+
+export function Categorias() {
+  const { usuario } = useAuth()
+  const admin = usuario.papel === 'ADMIN'
+  const client = useQueryClient()
+  const [buscaInput, setBuscaInput] = useState('')
+  const [busca, setBusca] = useState('')
+  const [ativa, setAtiva] = useState('')
+  const [pagina, setPagina] = useState(0)
+  const [modal, setModal] = useState<Categoria | 'nova' | null>(null)
+  const [error, setError] = useState<unknown>(null)
+  const [notice, setNotice] = useState('')
+  const [busy, setBusy] = useState(false)
+  const filtros = { pagina, tamanho: 20, busca, ativa }
+  const query = useQuery({ queryKey: ['categorias', 'lista', filtros], queryFn: ({ signal }) => catalogo.categorias(filtros, signal) })
+  const invalidate = () => { void client.invalidateQueries({ queryKey: ['categorias'] }) }
+  return <>
+    <header className="page-heading"><div><span className="eyebrow">SEU CATÁLOGO</span><h1>Categorias</h1><p>A organização do seu catálogo começa por aqui.</p></div>{admin && <button className="button" onClick={() => setModal('nova')}><Icon name="plus" size={18}/>Nova categoria</button>}</header>
+    {notice && <div className="notice success" role="status">{notice}</div>}
+    {error != null && <ErrorNotice error={error}/>}
+    <section className="panel"><div className="panel-title"><h2>Todas as categorias</h2>{query.data && <span className="count">{query.data.total} registros</span>}</div>
+      <form className="filters" onSubmit={event => { event.preventDefault(); setBusca(buscaInput.trim()); setPagina(0) }}><label className="search-input"><span className="sr-only">Buscar categorias</span><Icon name="search" size={18}/><input placeholder="Busque pelo nome da categoria" maxLength={100} value={buscaInput} onChange={event => setBuscaInput(event.target.value)}/></label><label><span className="sr-only">Filtrar situação</span><select value={ativa} onChange={event => { setAtiva(event.target.value); setPagina(0) }}><option value="">Todas as situações</option><option value="true">Ativas</option><option value="false">Inativas</option></select></label><button className="button secondary">Buscar</button></form>
+      {query.isPending ? <Loading/> : query.error ? <ErrorNotice error={query.error}><button className="button small secondary" onClick={() => void query.refetch()}>Tentar novamente</button></ErrorNotice> : <>
+        {!query.data.itens.length ? <Empty title="Nenhuma categoria encontrada"><p>{admin ? 'Cadastre uma categoria para organizar seus produtos.' : 'Consulte o administrador da sua organização.'}</p></Empty> : <div className="table-scroll"><table><thead><tr><th>Nome</th><th>Situação</th><th>Última atualização</th>{admin && <th className="align-right">Ações</th>}</tr></thead><tbody>{query.data.itens.map(c => <tr key={c.id}><td><strong>{c.nome}</strong></td><td><Badge active={c.ativa}/></td><td>{new Date(c.atualizadoEm).toLocaleDateString('pt-BR')}</td>{admin && <td><div className="row-actions"><button className="icon-button" aria-label={'Editar ' + c.nome} onClick={() => setModal(c)}><Icon name="edit" size={17}/></button><button className="text-button" disabled={busy} onClick={async () => {
+          if (!window.confirm((c.ativa ? 'Inativar' : 'Reativar') + ' a categoria “' + c.nome + '”? Produtos existentes serão preservados.')) return
+          setBusy(true); setError(null)
+          try { await catalogo.situacaoCategoria(c); setNotice('Situação da categoria atualizada.') } catch (err) { setError(err) } finally { setBusy(false); invalidate() }
+        }}>{c.ativa ? 'Inativar' : 'Reativar'}</button></div></td>}</tr>)}</tbody></table></div>}
+        <Pagination pagina={pagina} tamanho={20} total={query.data.total} onChange={setPagina}/>
+      </>}
+    </section><p className="page-footnote">Categorias inativas permanecem nos produtos existentes e não podem ser escolhidas em novas associações.</p>
+    {modal !== null && <CategoriaModal atual={modal === 'nova' ? undefined : modal} onClose={() => setModal(null)} onSaved={() => { invalidate(); setNotice('Categoria salva com sucesso.'); setModal(null) }}/>}
+  </>
+}
+const schema = z.object({ nome: z.string().trim().min(1, 'Informe o nome.').max(100, 'Use até 100 caracteres.') })
+function CategoriaModal({ atual, onClose, onSaved }: { atual?: Categoria; onClose: () => void; onSaved: () => void }) {
+  const [error, setError] = useState<unknown>(null)
+  const [current, setCurrent] = useState(atual)
+  const [reloading, setReloading] = useState(false)
+  const { register, handleSubmit, reset, formState: { errors, isDirty, isSubmitting } } = useForm({ resolver: zodResolver(schema), defaultValues: { nome: atual?.nome ?? '' } })
+  const busy = isSubmitting || reloading
+  const close = () => { if (!busy && (!isDirty || window.confirm('Descartar as alterações não salvas?'))) onClose() }
+  return <Modal title={current ? 'Editar categoria' : 'Nova categoria'} onClose={close} busy={busy}><form onSubmit={handleSubmit(async data => {
+    setError(null)
+    try { await catalogo.salvarCategoria(data.nome, current); onSaved() } catch (err) { setError(err) }
+  })} noValidate><div className="modal-body">
+    {error != null && <ErrorNotice error={error}>{current && <button type="button" className="button small secondary" disabled={busy} onClick={async () => {
+      if (!window.confirm('Recarregar a categoria e descartar o preenchimento?')) return
+      setReloading(true)
+      try {
+        const latest = await request<Categoria>('/categorias/' + current.id)
+        setCurrent(latest); reset({ nome: latest.nome }); setError(null)
+      } catch (err) { setError(err) } finally { setReloading(false) }
+    }}>Recarregar categoria</button>}</ErrorNotice>}
+    <Field label="Nome da categoria *" error={errors.nome?.message} hint="O nome deve ser único na organização, inclusive entre categorias inativas."><input autoFocus maxLength={100} disabled={busy} {...register('nome')} aria-invalid={!!errors.nome}/></Field></div>
+    <footer className="modal-footer"><span>* Campo obrigatório</span><div><button className="button secondary" type="button" disabled={busy} onClick={close}>Cancelar</button><button className="button" disabled={busy}>{busy ? 'Salvando…' : 'Salvar categoria'}</button></div></footer></form></Modal>
+}

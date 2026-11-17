@@ -8,7 +8,7 @@ Aplicação modular para redes de minimercados de autoatendimento. Cada empresa 
 
 Backend com Spring Boot, MySQL, Flyway e validação do schema. Já oferece provisionamento local de organização e administrador, login por sessão, consulta da conta e da organização atual e logout.
 
-O contexto da organização vem da sessão autenticada e é revalidado no banco. Já há gestão de funcionários, permissões por módulo/ação e categorias, restritas à organização do cliente. Já há API de produtos com imagens e dados fiscais opcionais. Ainda não há recuperação de senha ou interface web. Esta é a primeira entrega de identidade; os limites de produção estão descritos abaixo.
+O contexto da organização vem da sessão autenticada e é revalidado no banco. Já há gestão de funcionários, permissões por módulo/ação e categorias, restritas à organização do cliente. Já há API de produtos com imagens e dados fiscais opcionais. Já há uma primeira interface web para login, produtos e categorias. Ainda não há recuperação de senha. Esta é a primeira entrega de identidade; os limites de produção estão descritos abaixo.
 
 ## Tecnologias
 
@@ -26,7 +26,7 @@ backend/                  API e testes
     identidade/           Organizações e segurança
     catalogo/             Categorias e futuro cadastro de produtos
   src/main/resources/db/migration/
-frontend/                 Reservado; interface ainda não implementada
+frontend/                 Painel React/TypeScript: login, produtos e categorias
 scripts/backend.ps1       Execução e verificação no Windows
 compose.yaml              MySQL para desenvolvimento local
 ```
@@ -363,3 +363,17 @@ Imagens ficam fora do banco. Configure PRODUCT_IMAGES_DIR com um diretório abso
 Substituição e remoção limpam arquivos antigos depois do commit; rollback remove o arquivo recém-enviado e preserva o anterior. Uma interrupção abrupta do processo pode deixar arquivos órfãos, exigindo reconciliação operacional; essa implementação local não promete transação distribuída entre MySQL e filesystem.
 
 Reinicie o backend para aplicar a V5 e abrir os novos endpoints no Swagger. Para o frontend, recomenda-se concluir e integrar primeiro os commits de categorias e produtos; depois usar um novo chat com branch própria. Se houver desenvolvimento simultâneo, utilizar checkouts separados.
+
+## Executar o frontend
+
+Com o backend local em http://localhost:8080 e Node.js 22.12+ (linha 22) ou 24+, abra outro terminal:
+
+```powershell
+cd frontend
+npm ci
+npm run dev
+```
+
+Acesse http://127.0.0.1:5173 com uma conta provisionada. O proxy do Vite encaminha /api ao backend, preservando o fluxo de cookie de sessão e CSRF. Para testes e detalhes das telas disponíveis, consulte [frontend/README.md](frontend/README.md).
+
+Verificação do frontend: execute npx playwright install chromium uma vez, depois npm run verify em frontend/. O CI do frontend executa testes unitários, build e testes de navegador com API simulada; os testes de banco, autorização e isolamento continuam no CI do backend.
