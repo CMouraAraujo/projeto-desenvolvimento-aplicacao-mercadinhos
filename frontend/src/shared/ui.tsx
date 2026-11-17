@@ -32,16 +32,19 @@ export function Pagination({ pagina, tamanho, total, onChange }: { pagina: numbe
   const pages = Math.max(1, Math.ceil(total / tamanho))
   return <div className="pagination"><span>{total ? pagina * tamanho + 1 : 0}–{Math.min((pagina + 1) * tamanho, total)} de {total} registros</span><div><button className="button small secondary" disabled={pagina === 0} onClick={() => onChange(pagina - 1)}>Anterior</button><span aria-live="polite">{pagina + 1} / {pages}</span><button className="button small secondary" disabled={pagina + 1 >= pages} onClick={() => onChange(pagina + 1)}>Próxima</button></div></div>
 }
-export function Modal({ title, subtitle, children, onClose, busy = false }: { title: string; subtitle?: string; children: ReactNode; onClose: () => void; busy?: boolean }) {
+export function Modal({ title, subtitle, children, onClose, busy = false, className = '' }: { title: string; subtitle?: string; children: ReactNode; onClose: () => void; busy?: boolean; className?: string }) {
+  const titleId = useId()
+  const subtitleId = useId()
   const ref = useRef<HTMLDialogElement>(null)
   useEffect(() => {
     const dialog = ref.current!
     const previous = document.activeElement as HTMLElement | null
     dialog.showModal()
+    dialog.querySelector<HTMLElement>('input:not([disabled]), select:not([disabled]), textarea:not([disabled])')?.focus()
     return () => { dialog.close(); previous?.focus() }
   }, [])
-  return <dialog className="modal" ref={ref} aria-labelledby="modal-title" aria-describedby={subtitle ? 'modal-subtitle' : undefined} onCancel={event => { event.preventDefault(); if (!busy) onClose() }}>
-    <header className="modal-header"><div><span className="eyebrow">CATÁLOGO</span><h2 id="modal-title">{title}</h2>{subtitle && <p id="modal-subtitle">{subtitle}</p>}</div><button className="icon-button" aria-label="Fechar" disabled={busy} onClick={onClose}><Icon name="close"/></button></header>{children}
+  return <dialog className={'modal ' + className} ref={ref} aria-labelledby={titleId} aria-describedby={subtitle ? subtitleId : undefined} onCancel={event => { event.preventDefault(); event.stopPropagation(); if (!busy) onClose() }}>
+    <header className="modal-header"><div><span className="eyebrow">CATÁLOGO</span><h2 id={titleId}>{title}</h2>{subtitle && <p id={subtitleId}>{subtitle}</p>}</div><button type="button" className="icon-button" aria-label="Fechar" disabled={busy} onClick={onClose}><Icon name="close"/></button></header>{children}
   </dialog>
 }
 export function Field({ label, error, children, hint }: { label: string; error?: string; children: ReactElement; hint?: string }) {

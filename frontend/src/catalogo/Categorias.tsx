@@ -1,13 +1,10 @@
 import { useState } from 'react'
-import { useForm } from 'react-hook-form'
-import { zodResolver } from '@hookform/resolvers/zod'
-import { z } from 'zod'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { useAuth } from '../auth/Auth'
 import type { Categoria } from '../shared/types'
-import { Badge, Empty, ErrorNotice, Field, Icon, Loading, Modal, Pagination } from '../shared/ui'
+import { Badge, Empty, ErrorNotice, Icon, Loading, Pagination } from '../shared/ui'
 import { catalogo } from './api'
-import { request } from '../shared/api'
+import { CategoriaModal } from './CategoriaModal'
 
 export function Categorias() {
   const { usuario } = useAuth()
@@ -41,27 +38,4 @@ export function Categorias() {
     </section><p className="page-footnote">Categorias inativas permanecem nos produtos existentes e não podem ser escolhidas em novas associações.</p>
     {modal !== null && <CategoriaModal atual={modal === 'nova' ? undefined : modal} onClose={() => setModal(null)} onSaved={() => { invalidate(); setNotice('Categoria salva com sucesso.'); setModal(null) }}/>}
   </>
-}
-const schema = z.object({ nome: z.string().trim().min(1, 'Informe o nome.').max(100, 'Use até 100 caracteres.') })
-function CategoriaModal({ atual, onClose, onSaved }: { atual?: Categoria; onClose: () => void; onSaved: () => void }) {
-  const [error, setError] = useState<unknown>(null)
-  const [current, setCurrent] = useState(atual)
-  const [reloading, setReloading] = useState(false)
-  const { register, handleSubmit, reset, formState: { errors, isDirty, isSubmitting } } = useForm({ resolver: zodResolver(schema), defaultValues: { nome: atual?.nome ?? '' } })
-  const busy = isSubmitting || reloading
-  const close = () => { if (!busy && (!isDirty || window.confirm('Descartar as alterações não salvas?'))) onClose() }
-  return <Modal title={current ? 'Editar categoria' : 'Nova categoria'} onClose={close} busy={busy}><form onSubmit={handleSubmit(async data => {
-    setError(null)
-    try { await catalogo.salvarCategoria(data.nome, current); onSaved() } catch (err) { setError(err) }
-  })} noValidate><div className="modal-body">
-    {error != null && <ErrorNotice error={error}>{current && <button type="button" className="button small secondary" disabled={busy} onClick={async () => {
-      if (!window.confirm('Recarregar a categoria e descartar o preenchimento?')) return
-      setReloading(true)
-      try {
-        const latest = await request<Categoria>('/categorias/' + current.id)
-        setCurrent(latest); reset({ nome: latest.nome }); setError(null)
-      } catch (err) { setError(err) } finally { setReloading(false) }
-    }}>Recarregar categoria</button>}</ErrorNotice>}
-    <Field label="Nome da categoria *" error={errors.nome?.message} hint="O nome deve ser único na organização, inclusive entre categorias inativas."><input autoFocus maxLength={100} disabled={busy} {...register('nome')} aria-invalid={!!errors.nome}/></Field></div>
-    <footer className="modal-footer"><span>* Campo obrigatório</span><div><button className="button secondary" type="button" disabled={busy} onClick={close}>Cancelar</button><button className="button" disabled={busy}>{busy ? 'Salvando…' : 'Salvar categoria'}</button></div></footer></form></Modal>
 }

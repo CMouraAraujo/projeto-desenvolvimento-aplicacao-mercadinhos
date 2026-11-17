@@ -21,13 +21,14 @@ Abra http://127.0.0.1:5173. O Vite encaminha /api para o backend. Use uma conta 
 - Tratamento de 401 com remoção do cache privado e retorno ao login.
 - Navegação e ações conforme as permissões efetivas.
 - Produtos: paginação no servidor, busca por nome/código, filtros por categoria/situação, consulta, cadastro, edição e ativação/inativação.
-- Modal de produtos com abas Geral, Operacional e Fiscal, validação e confirmação de descarte.
-- Upload/substituição/remoção da imagem com controle de versão. O upload exige EDITAR, inclusive após um cadastro feito com CADASTRAR.
+- Modal de produtos em página única com seções Geral, Operacional e Fiscal, rolagem, espaçamento compacto, validação e confirmação de descarte.
+- Prévia ampliada da imagem imediatamente após a seleção, antes de salvar; cancelar a seleção restaura a imagem anterior, quando houver. Upload/substituição/remoção da imagem com controle de versão. O upload exige EDITAR, inclusive após um cadastro feito com CADASTRAR.
 - Falha no upload mantém o produto salvo e permite tentar apenas o envio novamente.
+- Cadastro de categoria pelo botão Nova categoria no modal de produto (ADMIN), com seleção automática e preservação do preenchimento do produto.
 - Categorias: consulta para PRODUTOS/CONSULTAR; cadastro, renomeação e situação exclusivos de ADMIN.
 - Layout responsivo, diálogo modal nativo com contenção de foco, rótulos e erros associados aos campos.
 
-Código de barras e códigos fiscais são strings. PUT de produto envia todos os campos editáveis; campos opcionais vazios viram null. Conflitos não são repetidos nem sobrescritos automaticamente: o preenchimento é mantido, e o usuário pode recarregar os dados atuais para revisar.
+Código de barras e códigos fiscais são strings. No formulário, NCM é exibido como XXXX.XX.XX e CEST como XX.XXX.XX; a API recebe somente os dígitos, preservando zeros à esquerda. A situação tributária de ICMS usa seleção por código com descrição curta: 101, 102, 103, 201, 202, 203, 300, 400, 500 e 60. O código 60 preenche icmsCst e os de três dígitos preenchem icmsCsosn, limpando o outro campo. Uma situação anterior fora da lista é preservada na edição até a escolha de outra opção. PUT de produto envia todos os campos editáveis; campos opcionais vazios viram null. Conflitos não são repetidos nem sobrescritos automaticamente: o preenchimento é mantido, e o usuário pode recarregar os dados atuais para revisar.
 
 ## Verificar
 
