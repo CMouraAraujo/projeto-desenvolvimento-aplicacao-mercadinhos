@@ -139,3 +139,11 @@ A imagemUrl é relativa e protegida. Usar com o mesmo proxy/origem e os cookies 
 Não há estoque, compras, preços por mercadinho, planograma, pagamentos, emissão fiscal ou integração do tablet. A imagem usa armazenamento local protegido por API; produção precisa de volume persistente, backups e estratégia de múltiplas instâncias. Recuperação de senha, convites e troca obrigatória da senha inicial continuam pendentes antes de uso com clientes reais.
 
 No novo chat, pedir para ler AGENTS.md, README.md, este guia e o OpenAPI local, implementar somente frontend/ e não alterar o contrato do backend sem coordenação. Começar por login, navegação, listagem e modal de produtos.
+
+## Classificação indicativa para menores
+
+Categorias aceitam permitidoParaMenores em POST/PUT (booleano). O padrão no cadastro é true; omitir ou enviar null no PUT preserva o valor atual. A checkbox representa o inverso: "Proibida para menores de 18 anos". Desmarcada envia permitidoParaMenores=true, marcada envia false. A edição recupera a classificação com a mesma inversão.
+
+As respostas de categorias e produtos incluem permitidoParaMenores. Produtos recebem uma cópia da classificação da categoria ao cadastrar ou trocar categoria. O campo não é aceito como entrada no JSON de produtos. Mudanças posteriores da categoria não atualizam cópias existentes, inclusive ao salvar o produto sem trocar categoria.
+
+A V6 adiciona as colunas permitido_para_menores em categorias e produtos com padrão false e restrições de não nulo e 0/1. A V7 altera apenas os defaults para true, sem modificar classificações já salvas. Reiniciar o backend atualizado aplica as migrations. O cadastro e a edição de categorias continuam exclusivos de ADMIN; apenas a classificação fica registrada, sem verificação etária ou bloqueio de venda nesta etapa.

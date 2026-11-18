@@ -43,7 +43,7 @@ class CategoriasService {
     @PreAuthorize("hasRole('ADMIN')")
     public CategoriaDTO cadastrar(@Valid NovaCategoria dados) {
         acesso.exigir(Modulo.PRODUTOS, Acao.CADASTRAR);
-        return CategoriaDTO.de(categorias.saveAndFlush(new Categoria(acesso.organizacaoId(), nomeValido(dados.nome()))));
+        return CategoriaDTO.de(categorias.saveAndFlush(new Categoria(acesso.organizacaoId(), nomeValido(dados.nome()), !Boolean.FALSE.equals(dados.permitidoParaMenores()))));
     }
 
     @Transactional
@@ -52,6 +52,9 @@ class CategoriasService {
         acesso.exigir(Modulo.PRODUTOS, Acao.EDITAR);
         var categoria = paraAlterar(id, dados.versao());
         categoria.renomear(nomeValido(dados.nome()));
+        if (dados.permitidoParaMenores() != null) {
+            categoria.alterarPermissaoParaMenores(dados.permitidoParaMenores());
+        }
         categorias.flush();
         return CategoriaDTO.de(categoria);
     }

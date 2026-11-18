@@ -37,7 +37,7 @@ class CategoriasController {
     CategoriaDTO obter(@PathVariable @Positive Long id) { return categorias.obter(id); }
 
     @PostMapping
-    @Operation(summary = "Cadastrar categoria", description = "Somente administrador. Nome de até 100 caracteres, único por organização inclusive entre inativas; ignora caixa e acentos.")
+    @Operation(summary = "Cadastrar categoria", description = "Somente administrador. Nome de até 100 caracteres, único por organização inclusive entre inativas; ignora caixa e acentos. permitidoParaMenores é opcional e começa true (categoria livre).")
     @SecurityRequirement(name = "csrf")
     @ApiResponse(responseCode = "201", description = "Categoria criada")
     @ApiResponse(responseCode = "409", description = "Nome já utilizado na organização")
@@ -47,7 +47,7 @@ class CategoriasController {
     }
 
     @PutMapping("/{id}")
-    @Operation(summary = "Renomear categoria", description = "Somente administrador; exige versão atual.")
+    @Operation(summary = "Editar categoria", description = "Somente administrador; exige versão atual. Omitir permitidoParaMenores preserva a classificação. Alterações valem para novos produtos e novos vínculos; não reclassificam produtos existentes.")
     @SecurityRequirement(name = "csrf")
     @ApiResponse(responseCode = "404", description = "Categoria inexistente ou de outra organização")
     @ApiResponse(responseCode = "409", description = "Nome duplicado ou versão desatualizada")

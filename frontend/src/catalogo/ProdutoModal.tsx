@@ -109,10 +109,10 @@ function ProdutoEditor({ initial, categorias, opcoes, onClose, onSaved }: Props 
           <section className="product-section" aria-labelledby="produto-geral">
             <div className="section-heading"><span className="eyebrow">01 · IDENTIFICAÇÃO</span><h3 id="produto-geral">Geral</h3><p>O essencial para encontrar e organizar seu produto.</p></div>
             <div className="form-grid">
-              <Field label="Nome do produto *" error={errors.nome?.message}><input maxLength={200} placeholder="Ex.: Café torrado 500 g" {...register('nome')} aria-invalid={!!errors.nome}/></Field>
-              <Field label="Código de barras *" error={errors.codigoBarras?.message} hint="Somente números. Os zeros à esquerda serão mantidos."><input inputMode="numeric" maxLength={64} {...register('codigoBarras')} aria-invalid={!!errors.codigoBarras}/></Field>
+              <Field label="Nome do produto" required error={errors.nome?.message}><input maxLength={200} placeholder="Ex.: Café torrado 500 g" {...register('nome')} aria-invalid={!!errors.nome}/></Field>
+              <Field label="Código de barras" required error={errors.codigoBarras?.message} hint="Somente números. Os zeros à esquerda serão mantidos."><input inputMode="numeric" maxLength={64} {...register('codigoBarras')} aria-invalid={!!errors.codigoBarras}/></Field>
               <div className="category-picker">
-                <Field label="Categoria *" error={errors.categoriaId?.message}><select {...register('categoriaId')} aria-invalid={!!errors.categoriaId}><option value="">Selecione uma categoria</option>{categorias.filter(c => c.ativa || c.id === current?.categoriaId).map(c => <option key={c.id} value={c.id}>{c.nome}{c.ativa ? '' : ' (inativa)'}</option>)}</select></Field>
+                <Field label="Categoria" required error={errors.categoriaId?.message}><select {...register('categoriaId')} aria-invalid={!!errors.categoriaId}><option value="">Selecione uma categoria</option>{categorias.filter(c => c.ativa || c.id === current?.categoriaId).map(c => <option key={c.id} value={c.id}>{c.nome}{c.ativa ? '' : ' (inativa)'}</option>)}</select></Field>
                 {!readOnly && usuario.papel === 'ADMIN' && <button type="button" className="button small secondary" onClick={() => setNovaCategoria(true)}><Icon name="plus" size={15}/>Nova categoria</button>}
                 {categoriaCriada && <small className="category-feedback" role="status">Categoria “{categoriaCriada}” criada e selecionada.</small>}
               </div>
@@ -143,7 +143,7 @@ function ProdutoEditor({ initial, categorias, opcoes, onClose, onSaved }: Props 
           </section>
           <section className="product-section" aria-labelledby="produto-operacional">
             <div className="section-heading"><span className="eyebrow">02 · CONFIGURAÇÃO</span><h3 id="produto-operacional">Operacional</h3><p>Estas opções preparam o cadastro para os próximos módulos.</p></div>
-            <Field label="Unidade de medida *" error={errors.unidadeMedida?.message}><select {...register('unidadeMedida')}>{opcoes.unidadesMedida.map(u => <option key={u} value={u}>{u}</option>)}</select></Field>
+            <Field label="Unidade de medida" required error={errors.unidadeMedida?.message}><select {...register('unidadeMedida')}>{opcoes.unidadesMedida.map(u => <option key={u} value={u}>{u}</option>)}</select></Field>
             <div className="check-list">
               <label><input type="checkbox" {...register('permiteVendaFracionada')}/><span><strong>Permite venda fracionada</strong><small>Indica se o produto pode ser vendido em frações.</small></span></label>
               <label><input type="checkbox" {...register('controlaLote')}/><span><strong>Controla lote</strong><small>O registro dos lotes será feito em uma etapa futura.</small></span></label>
@@ -151,7 +151,7 @@ function ProdutoEditor({ initial, categorias, opcoes, onClose, onSaved }: Props 
             </div>
           </section>
           <section className="product-section" aria-labelledby="produto-fiscal">
-            <div className="section-heading"><span className="eyebrow">03 · CLASSIFICAÇÃO</span><h3 id="produto-fiscal">Fiscal</h3><p>Preenchimento opcional. Valide o enquadramento com sua contabilidade.</p></div>
+            <div className="section-heading"><span className="eyebrow">03 · CLASSIFICAÇÃO</span><h3 id="produto-fiscal">Fiscal</h3><p>NCM, CFOP e situação tributária de ICMS são obrigatórios. Valide o enquadramento com sua contabilidade.</p></div>
             <div className="notice">Estes dados não realizam cálculos tributários nem emissão de documentos fiscais.</div>
             <div className="form-grid">{fiscalFields.map(([key, label, length]) =>
               key === 'icmsCsosn' ? null
@@ -159,14 +159,14 @@ function ProdutoEditor({ initial, categorias, opcoes, onClose, onSaved }: Props 
                   ? <Controller key={key} name="dadosFiscais.icmsCsosn" control={control} render={({ field, fieldState }) => {
                       const codigo = field.value || icmsCst
                       const conhecida = situacoesIcms.find(s => s.codigo === codigo)
-                      return <Field label="Situação tributária de ICMS" error={fieldState.error?.message || errors.dadosFiscais?.icmsCst?.message}>
+                      return <Field label="Situação tributária de ICMS" required error={fieldState.error?.message || errors.dadosFiscais?.icmsCst?.message}>
                         <select {...field} value={codigo} title={conhecida?.descricao} onChange={event => {
                           const campos = camposSituacaoIcms(event.target.value)
                           setValue('dadosFiscais.icmsCst', campos.icmsCst, { shouldDirty: true })
                           field.onChange(campos.icmsCsosn)
                           void trigger(['dadosFiscais.icmsCst', 'dadosFiscais.icmsCsosn'])
                         }}>
-                          <option value="">Não informado</option>
+                          <option value="">Selecione a situação tributária</option>
                           {codigo && !conhecida && <option value={codigo}>{codigo} – Código já cadastrado</option>}
                           {situacoesIcms.map(s => <option key={s.codigo} value={s.codigo} title={s.descricao}>{s.codigo} – {s.resumo}</option>)}
                         </select>
@@ -174,15 +174,15 @@ function ProdutoEditor({ initial, categorias, opcoes, onClose, onSaved }: Props 
                     }}/>
                   : key === 'ncm' || key === 'cest'
                 ? <Controller key={key} name={`dadosFiscais.${key}`} control={control} render={({ field, fieldState }) =>
-                    <Field label={label} error={fieldState.error?.message}><CodigoFiscalInput {...field} tipo={key}/></Field>
+                    <Field label={label} required={key === 'ncm'} error={fieldState.error?.message}><CodigoFiscalInput {...field} tipo={key}/></Field>
                   }/>
-                : <Field key={key} label={label} error={errors.dadosFiscais?.[key]?.message}><input inputMode={key === 'icmsAliquota' || key === 'icmsReducaoBase' ? 'decimal' : 'numeric'} maxLength={length} {...register(`dadosFiscais.${key}` as const)}/></Field>,
+                : <Field key={key} label={label} required={key === 'cfopPadrao'} error={errors.dadosFiscais?.[key]?.message}><input inputMode={key === 'icmsAliquota' || key === 'icmsReducaoBase' ? 'decimal' : 'numeric'} maxLength={length} {...register(`dadosFiscais.${key}` as const)}/></Field>,
             )}</div>
           </section>
         </fieldset>
         {current && <p className="audit">ID #{current.id} · Atualizado em {new Date(current.atualizadoEm).toLocaleString('pt-BR')} · Usuário #{current.atualizadoPor}</p>}
       </div>
-      <footer className="modal-footer"><span>{readOnly ? 'Modo de consulta' : '* Campos obrigatórios'}</span><div><button type="button" className="button secondary" disabled={busy} onClick={close}>{readOnly ? 'Fechar' : 'Cancelar'}</button>{!readOnly && <button type="submit" className="button" disabled={busy}>{busy ? 'Salvando…' : imagePending ? 'Tentar enviar imagem' : 'Salvar produto'}</button>}</div></footer>
+      <footer className="modal-footer"><span>{readOnly ? 'Modo de consulta' : <><span className="required-indicator" aria-hidden="true">*</span> Campos obrigatórios</>}</span><div><button type="button" className="button secondary" disabled={busy} onClick={close}>{readOnly ? 'Fechar' : 'Cancelar'}</button>{!readOnly && <button type="submit" className="button" disabled={busy}>{busy ? 'Salvando…' : imagePending ? 'Tentar enviar imagem' : 'Salvar produto'}</button>}</div></footer>
     </form>
     {novaCategoria && <CategoriaModal onClose={() => setNovaCategoria(false)} onSaved={categoria => {
       client.setQueryData<Categoria[]>(['categorias', 'seletor'], atuais =>

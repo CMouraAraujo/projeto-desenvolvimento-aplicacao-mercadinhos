@@ -17,13 +17,15 @@ export const produtoSchema = z.object({
   descricao: z.string().max(4000), marca: z.string().max(100),
   permiteVendaFracionada: z.boolean(), controlaLote: z.boolean(), controlaValidade: z.boolean(),
   dadosFiscais: z.object({
-    ncm: codigo(8, 'NCM'), cest: codigo(7, 'CEST'), cfopPadrao: codigo(4, 'CFOP'),
+    ncm: z.string().regex(/^[0-9]{8}$/, 'NCM: informe 8 dígitos.'), cest: codigo(7, 'CEST'),
+    cfopPadrao: z.string().regex(/^[0-9]{4}$/, 'CFOP: informe 4 dígitos.'),
     pisCst: codigo(2, 'PIS'), cofinsCst: codigo(2, 'COFINS'),
     origem: z.string().regex(/^$|^[0-8]$/, 'Informe de 0 a 8.'),
     icmsCst: codigo(2, 'CST'), icmsCsosn: codigo(3, 'CSOSN'),
     icmsModalidadeBaseCalculo: z.string().regex(/^$|^[0-9]{1,2}$/, 'Informe 1 ou 2 dígitos.'),
     icmsAliquota: percentual, icmsReducaoBase: percentual,
-  }).refine(v => !(v.icmsCst && v.icmsCsosn), { message: 'Informe CST ou CSOSN, nunca os dois.', path: ['icmsCsosn'] }),
+  }).refine(v => !(v.icmsCst && v.icmsCsosn), { message: 'Informe CST ou CSOSN, nunca os dois.', path: ['icmsCsosn'] })
+    .refine(v => !!(v.icmsCst || v.icmsCsosn), { message: 'Selecione a situação tributária de ICMS.', path: ['icmsCsosn'] }),
 })
 export type ProdutoForm = z.infer<typeof produtoSchema>
 export function valoresProduto(produto?: Produto): ProdutoForm {

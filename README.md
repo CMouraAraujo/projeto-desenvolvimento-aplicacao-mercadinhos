@@ -377,3 +377,15 @@ npm run dev
 Acesse http://127.0.0.1:5173 com uma conta provisionada. O proxy do Vite encaminha /api ao backend, preservando o fluxo de cookie de sessão e CSRF. Para testes e detalhes das telas disponíveis, consulte [frontend/README.md](frontend/README.md).
 
 Verificação do frontend: execute npx playwright install chromium uma vez, depois npm run verify em frontend/. O CI do frontend executa testes unitários, build e testes de navegador com API simulada; os testes de banco, autorização e isolamento continuam no CI do backend.
+
+## Classificação indicativa para menores
+
+A migration V6 adiciona permitido_para_menores BOOLEAN NOT NULL DEFAULT FALSE às tabelas categorias e produtos, com restrições para aceitar somente 0/1. Na V6 os registros existentes começam false, sem alterar nomes, vínculos ou códigos. A V7 muda o padrão de novos registros para TRUE, preservando os valores já salvos.
+
+POST /api/categorias aceita permitidoParaMenores (booleano opcional; padrão true). PUT /api/categorias/{id} aceita o mesmo campo junto de nome e versao; omiti-lo ou enviá-lo nulo preserva a classificação atual. As respostas de categorias e produtos incluem permitidoParaMenores.
+
+O backend copia a classificação da categoria da própria organização ao criar o produto ou trocar sua categoria. O cliente não escolhe esse valor no JSON de produtos. A classificação é uma cópia: alterar uma categoria, renomear um produto, mudar sua situação ou imagem não reclassifica produtos existentes. Alterações continuam protegidas por autorização, CSRF, organização e versão.
+
+A checkbox "Proibida para menores de 18 anos" está nos modais de criar/editar categoria, inclusive no cadastro de produto. Ela começa desmarcada (livre, permitidoParaMenores=true); marcada significa restrita (permitidoParaMenores=false). Atualize e reinicie o backend para aplicar as migrations V6/V7 antes de usar a interface atualizada. Não é necessário apagar o banco nem recriar as contas.
+
+Essa informação é preparatória: ainda não há verificação de idade nem bloqueio de vendas. A classificação dos dados existentes deve ser revisada antes de implementar qualquer regra de venda baseada nela.

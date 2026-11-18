@@ -19,6 +19,8 @@ class Categoria {
     private String nome;
     @Column(nullable = false)
     private boolean ativa = true;
+    @Column(name = "permitido_para_menores", nullable = false)
+    private boolean permitidoParaMenores;
     @Version
     @Column(nullable = false)
     private long versao;
@@ -27,15 +29,21 @@ class Categoria {
     @Column(name = "atualizado_em", nullable = false)
     private Instant atualizadoEm;
 
-    Categoria(Long organizacaoId, String nome) {
+    Categoria(Long organizacaoId, String nome, boolean permitidoParaMenores) {
         this.organizacaoId = organizacaoId;
         this.nome = nome;
+        this.permitidoParaMenores = permitidoParaMenores;
         criadoEm = Instant.now();
         atualizadoEm = criadoEm;
     }
 
     void renomear(String nome) {
         this.nome = nome;
+        atualizadoEm = Instant.now();
+    }
+
+    void alterarPermissaoParaMenores(boolean permitido) {
+        permitidoParaMenores = permitido;
         atualizadoEm = Instant.now();
     }
 

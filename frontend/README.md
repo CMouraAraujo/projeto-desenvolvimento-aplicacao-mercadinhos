@@ -21,6 +21,7 @@ Abra http://127.0.0.1:5173. O Vite encaminha /api para o backend. Use uma conta 
 - Tratamento de 401 com remoção do cache privado e retorno ao login.
 - Navegação e ações conforme as permissões efetivas.
 - Produtos: paginação no servidor, busca por nome/código, filtros por categoria/situação, consulta, cadastro, edição e ativação/inativação.
+- No formulário de produto, nome, categoria, código de barras, unidade de medida, NCM, CFOP e situação tributária de ICMS são obrigatórios, indicados por asterisco vermelho e atributos de acessibilidade. A edição de produtos antigos sem esses dados exige completá-los antes de salvar.
 - Modal de produtos em página única com seções Geral, Operacional e Fiscal, rolagem, espaçamento compacto, validação e confirmação de descarte.
 - Prévia ampliada da imagem imediatamente após a seleção, antes de salvar; cancelar a seleção restaura a imagem anterior, quando houver. Upload/substituição/remoção da imagem com controle de versão. O upload exige EDITAR, inclusive após um cadastro feito com CADASTRAR.
 - Falha no upload mantém o produto salvo e permite tentar apenas o envio novamente.
@@ -58,6 +59,14 @@ Dependências diretas de aplicação sob MIT; TypeScript e Playwright sob Apache
 
 ## Limites
 
-A gestão de funcionários e permissões tem API, mas ainda não tem tela. Recuperação de senha, convites e troca obrigatória de senha inicial dependem de evolução do backend. Não há preços, estoque, mercadinhos, emissão fiscal ou autoatendimento nesta entrega. Dados fiscais opcionais não constituem homologação tributária.
+A gestão de funcionários e permissões tem API, mas ainda não tem tela. Recuperação de senha, convites e troca obrigatória de senha inicial dependem de evolução do backend. Não há preços, estoque, mercadinhos, emissão fiscal ou autoatendimento nesta entrega. O preenchimento fiscal não constitui homologação tributária. A obrigatoriedade de NCM, CFOP e situação de ICMS está aplicada no frontend; o contrato atual do backend ainda aceita dados fiscais opcionais. Torná-los obrigatórios também na API exige coordenação com o backend.
 
 A validação autenticada contra o backend real deve ser feita com conta provisionada e categorias da organização. Os testes do frontend verificam comportamento da interface; autorização e isolamento entre organizações continuam sendo responsabilidade e cobertura do backend.
+
+## Classificação indicativa para menores de 18 anos
+
+O modal de categoria, inclusive quando aberto dentro do produto, contém a checkbox "Proibida para menores de 18 anos". Ela começa desmarcada: categoria livre (permitidoParaMenores=true). Marcada: categoria restrita (permitidoParaMenores=false). A gestão permanece exclusiva de administradores.
+
+A API persiste permitidoParaMenores na categoria e copia o valor para o produto ao cadastrá-lo ou trocar de categoria. Alterar a classificação da categoria ou editar um produto mantendo a categoria não reclassifica produtos existentes. Essa cópia permite evolução futura; ainda não existe verificação de idade ou bloqueio de venda.
+
+A migration V6 do backend cria permitido_para_menores BOOLEAN NOT NULL DEFAULT FALSE nas tabelas categorias e produtos. A V7 muda o padrão de novos registros para TRUE, sem inverter classificações existentes. Reinicie o backend atualizado para aplicar as migrations antes de usar a checkbox. Registros anteriores conservam os valores já salvos.

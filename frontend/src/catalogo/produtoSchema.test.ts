@@ -2,13 +2,17 @@ import { describe, expect, it } from 'vitest'
 import { dadosProduto, produtoSchema, valoresProduto } from './produtoSchema'
 import { pode, type Produto, type Usuario } from '../shared/types'
 
-const valid = () => ({ ...valoresProduto(), nome: 'Café', codigoBarras: '00012345', categoriaId: '3' })
+const valid = () => {
+  const form = { ...valoresProduto(), nome: 'Café', codigoBarras: '00012345', categoriaId: '3' }
+  Object.assign(form.dadosFiscais, { ncm: '09012100', cfopPadrao: '5102', icmsCsosn: '102' })
+  return form
+}
 describe('contrato do produto', () => {
   it('preserva zeros e converte campos fiscais vazios para null', () => {
     const result = dadosProduto(produtoSchema.parse(valid()))
     expect(result.codigoBarras).toBe('00012345')
     expect(result.categoriaId).toBe(3)
-    expect(result.dadosFiscais).toBeNull()
+    expect(result.dadosFiscais).toMatchObject({ ncm: '09012100', cfopPadrao: '5102', icmsCsosn: '102', cest: null, pisCst: null })
     expect(result).not.toHaveProperty('organizacaoId')
   })
   it('aceita decimal com vírgula e preserva códigos fiscais', () => {
@@ -48,5 +52,32 @@ describe('permissões de interface', () => {
   })
   it('concede ações conhecidas ao administrador', () => {
     expect(pode({ papel: 'ADMIN' } as Usuario, [], 'EDITAR')).toBe(true)
+  })
+})
+
+describe('campos obrigatórios do formulário de produto', () => {
+  it.each(['nome', 'categoriaId'] as const)('rejeita %s vazio sem preencher valores por padrão', campo => {
+    const form = valid()
+    form[campo] = ''
+    const result = produtoSchema.safeParse(form)
+    expect(result.success).toBe(false)
+    if (!result.success) expect(result.error.issues.some(issue => issue.path.join('.') === campo)).toBe(true)
+  })
+  it.each(['ncm', 'cfopPadrao'] as const)('rejeita %s ausente', campo => {
+    const form = valid()
+    form.dadosFiscais[campo] = ''
+    const result = produtoSchema.safeParse(form)
+    expect(result.success).toBe(false)
+    if (!result.success) expect(result.error.issues.some(issue => issue.path.join('.') === 'dadosFiscais.' + campo)).toBe(true)
+  })
+  it('exige ICMS e aceita tanto CST quanto CSOSN', () => {
+    const form = valid()
+    form.dadosFiscais.icmsCsosn = ''
+    expect(produtoSchema.safeParse(form).success).toBe(false)
+    form.dadosFiscais.icmsCst = '60'
+    expect(produtoSchema.safeParse(form).success).toBe(true)
+    form.dadosFiscais.icmsCst = ''
+    form.dadosFiscais.icmsCsosn = '102'
+    expect(produtoSchema.safeParse(form).success).toBe(true)
   })
 })

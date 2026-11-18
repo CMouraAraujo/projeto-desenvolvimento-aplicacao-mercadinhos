@@ -48,8 +48,8 @@ class ProdutosService {
         acesso.exigir(Modulo.PRODUTOS, Acao.CADASTRAR);
         Long org = acesso.organizacaoId();
         validarNome(dados.nome());
-        exigirCategoriaAtiva(dados.categoriaId(), org);
-        return mapper.resposta(produtos.saveAndFlush(new Produto(org, dados, acesso.usuarioId())));
+        var categoria = exigirCategoriaAtiva(dados.categoriaId(), org);
+        return mapper.resposta(produtos.saveAndFlush(new Produto(org, dados, acesso.usuarioId(), categoria.isPermitidoParaMenores())));
     }
 
     @Transactional
@@ -58,10 +58,11 @@ class ProdutosService {
         var produto = paraAlterar(id, alteracao.versao());
         var dados = alteracao.dados();
         validarNome(dados.nome());
+        boolean permitidoParaMenores = produto.isPermitidoParaMenores();
         if (!produto.getCategoriaId().equals(dados.categoriaId())) {
-            exigirCategoriaAtiva(dados.categoriaId(), produto.getOrganizacaoId());
+            permitidoParaMenores = exigirCategoriaAtiva(dados.categoriaId(), produto.getOrganizacaoId()).isPermitidoParaMenores();
         }
-        produto.preencher(dados, acesso.usuarioId());
+        produto.preencher(dados, acesso.usuarioId(), permitidoParaMenores);
         produtos.flush();
         return mapper.resposta(produto);
     }
@@ -83,10 +84,11 @@ class ProdutosService {
         return produto;
     }
 
-    private void exigirCategoriaAtiva(Long categoriaId, Long org) {
+    private Categoria exigirCategoriaAtiva(Long categoriaId, Long org) {
         var categoria = categorias.buscarParaAlterar(categoriaId, org)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Categoria não encontrada"));
         if (!categoria.isAtiva()) { throw new ResponseStatusException(HttpStatus.CONFLICT, "Selecione uma categoria ativa"); }
+        return categoria;
     }
 
     private static void validarNome(String nome) {

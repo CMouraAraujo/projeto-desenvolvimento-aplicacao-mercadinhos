@@ -59,8 +59,8 @@ class ProdutosIntegrationTests {
         if (hash == null) { hash = encoder.encode("Senha-de-teste-2026!"); }
         orgA = inserir("organizacoes", Map.of("nome", "Produtos A"));
         orgB = inserir("organizacoes", Map.of("nome", "Produtos B"));
-        catA = inserir("categorias", Map.of("organizacao_id", orgA, "nome", "Categoria A"));
-        catB = inserir("categorias", Map.of("organizacao_id", orgB, "nome", "Categoria B"));
+        catA = inserir("categorias", Map.of("organizacao_id", orgA, "nome", "Categoria A", "permitido_para_menores", false));
+        catB = inserir("categorias", Map.of("organizacao_id", orgB, "nome", "Categoria B", "permitido_para_menores", false));
         admin = usuario(orgA, "ADMIN", List.of());
         outroAdmin = usuario(orgB, "ADMIN", List.of());
         consulta = usuario(orgA, "FUNCIONARIO", List.of("CONSULTAR"));
@@ -332,6 +332,42 @@ class ProdutosIntegrationTests {
                 .isInstanceOf(org.springframework.web.server.ResponseStatusException.class)
                 .satisfies(e -> assertThat(((org.springframework.web.server.ResponseStatusException) e).getStatusCode().value()).isEqualTo(503));
         assertThat(Files.readString(bloqueado)).isEqualTo("preservar");
+    }
+    @Test
+    void produtoCopiaClassificacaoDaCategoriaAoCriarETrocarCategoria() throws Exception {
+        Long livre = inserir("categorias", Map.of("organizacao_id", orgA, "nome", "Livre", "permitido_para_menores", true));
+        long id = criarId(cadastro, "000123", catA);
+        mvc.perform(get("/api/produtos/" + id).with(user(consulta))).andExpect(status().isOk())
+                .andExpect(jsonPath("$.permitidoParaMenores").value(false));
+        criar(cadastro, dados("000124", livre)).andExpect(status().isCreated())
+                .andExpect(jsonPath("$.permitidoParaMenores").value(true));
+        editar(edicao, id, 0, dados("000123", livre)).andExpect(status().isOk())
+                .andExpect(jsonPath("$.permitidoParaMenores").value(true));
+        assertThat(jdbc.queryForObject("SELECT permitido_para_menores FROM produtos WHERE id = ?", Boolean.class, id)).isTrue();
+
+        // A classificação do produto é uma cópia: renomear ou editar a mesma categoria não reclassifica o histórico.
+        jdbc.update("UPDATE categorias SET permitido_para_menores = false WHERE id = ?", livre);
+        editar(edicao, id, 1, dados("000123", livre)).andExpect(status().isOk())
+                .andExpect(jsonPath("$.permitidoParaMenores").value(true));
+        editar(edicao, id, 2, dados("000123", catA)).andExpect(status().isOk())
+                .andExpect(jsonPath("$.permitidoParaMenores").value(false));
+        assertThat(jdbc.queryForObject("SELECT permitido_para_menores FROM produtos WHERE id = ?", Boolean.class, id)).isFalse();
+        mvc.perform(get("/api/produtos/por-codigo/000123").with(user(consulta))).andExpect(status().isOk())
+                .andExpect(jsonPath("$.permitidoParaMenores").value(false));
+    }
+
+    @Test
+    void classificacaoDoProdutoNaoPodeSerInjetadaNemCopiadaDeOutraOrganizacao() throws Exception {
+        var dados = dados("123", catA);
+        dados.put("permitidoParaMenores", true);
+        criar(admin, dados).andExpect(status().isBadRequest());
+        long id = criarId(admin, "123", catA);
+        editar(admin, id, 0, dados).andExpect(status().isBadRequest());
+        jdbc.update("UPDATE categorias SET permitido_para_menores = true WHERE id = ?", catB);
+        editar(edicao, id, 0, dados("123", catB)).andExpect(status().isNotFound());
+        editar(consulta, id, 0, dados("123", catA)).andExpect(status().isForbidden());
+        assertThat(jdbc.queryForObject("SELECT permitido_para_menores FROM produtos WHERE id = ?", Boolean.class, id)).isFalse();
+        assertThat(jdbc.queryForObject("SELECT categoria_id FROM produtos WHERE id = ?", Long.class, id)).isEqualTo(catA);
     }
     private List<Integer> concorrer(Callable<Integer> chamada) throws Exception {
         var inicio = new CountDownLatch(1);

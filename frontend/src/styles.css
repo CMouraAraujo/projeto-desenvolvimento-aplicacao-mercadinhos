@@ -41,3 +41,5 @@
 .product-modal>form{display:flex;flex-direction:column;min-height:0}
 .product-modal>form>.modal-body{overflow-y:auto;min-height:0;overscroll-behavior:contain;scroll-padding-block:20px}
 .product-modal .modal-footer{position:static}
+
+.required-indicator{color:#b42318;font-weight:700}

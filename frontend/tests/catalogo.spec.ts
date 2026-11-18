@@ -1,7 +1,8 @@
 import { test, expect, type Page } from '@playwright/test'
 
-const categoria = { id: 1, nome: 'Mercearia', ativa: true, versao: 0, criadoEm: '2026-11-16T12:00:00Z', atualizadoEm: '2026-11-16T12:00:00Z' }
-const produto = { id: 1, nome: 'Café torrado 500 g', codigoBarras: '00012345', categoriaId: 1, unidadeMedida: 'UN', descricao: null, marca: 'Café da Serra', permiteVendaFracionada: false, controlaLote: false, controlaValidade: true, dadosFiscais: null, ativo: true, versao: 3, imagemUrl: null, criadoEm: '2026-11-16T12:00:00Z', atualizadoEm: '2026-11-16T12:00:00Z', criadoPor: 1, atualizadoPor: 1 }
+const categoria = { id: 1, nome: 'Mercearia', ativa: true, permitidoParaMenores: false, versao: 0, criadoEm: '2026-11-16T12:00:00Z', atualizadoEm: '2026-11-16T12:00:00Z' }
+const fiscalObrigatorio = { ncm: '09012100', cfopPadrao: '5102', icmsCst: null, icmsCsosn: '102' }
+const produto = { id: 1, nome: 'Café torrado 500 g', codigoBarras: '00012345', categoriaId: 1, unidadeMedida: 'UN', descricao: null, marca: 'Café da Serra', permiteVendaFracionada: false, controlaLote: false, controlaValidade: true, dadosFiscais: fiscalObrigatorio, ativo: true, permitidoParaMenores: false, versao: 3, imagemUrl: null, criadoEm: '2026-11-16T12:00:00Z', atualizadoEm: '2026-11-16T12:00:00Z', criadoPor: 1, atualizadoPor: 1 }
 type Options = { admin?: boolean; authenticated?: boolean; permissions?: string[] }
 async function mockApi(page: Page, options: Options = {}) {
   let authenticated = options.authenticated !== false
@@ -31,6 +32,11 @@ async function mockApi(page: Page, options: Options = {}) {
     return route.fulfill({ status: 404 })
   })
   return calls
+}
+async function preencherFiscalObrigatorio(page: Page) {
+  await page.getByRole('textbox', { name: 'NCM', exact: true }).fill('09012100')
+  await page.getByRole('textbox', { name: 'CFOP padrão', exact: true }).fill('5102')
+  await page.getByRole('combobox', { name: 'Situação tributária de ICMS', exact: true }).selectOption('102')
 }
 test('login usa formulário e renova CSRF para logout; limpa a tela privada', async ({ page }) => {
   const calls = await mockApi(page, { authenticated: false })
@@ -75,10 +81,10 @@ test('conflito mantém formulário e não repete edição automaticamente', asyn
   })
   await page.goto('/')
   await page.getByRole('button', { name: 'Editar ' + produto.nome, exact: true }).click()
-  await page.getByLabel('Nome do produto *', { exact: true }).fill('Novo café')
+  await page.getByRole('textbox', { name: 'Nome do produto', exact: true }).fill('Novo café')
   await page.getByRole('button', { name: 'Salvar produto' }).click()
   await expect(page.getByRole('alert')).toContainText('Versão desatualizada.')
-  await expect(page.getByLabel('Nome do produto *', { exact: true })).toHaveValue('Novo café')
+  await expect(page.getByRole('textbox', { name: 'Nome do produto', exact: true })).toHaveValue('Novo café')
   expect(writes).toBe(1)
 })
 test('expiração de sessão limpa catálogo e retorna ao login', async ({ page }) => {
@@ -103,9 +109,10 @@ test('upload com falha permite tentar novamente sem cadastrar outro produto', as
   await page.goto('/')
   await page.screenshot({ path: test.info().outputPath('catalogo.png'), fullPage: true })
   await page.getByRole('button', { name: 'Novo produto', exact: true }).click()
-  await page.getByLabel('Nome do produto *', { exact: true }).fill('Café novo')
-  await page.getByLabel('Código de barras *', { exact: true }).fill('000987')
-  await page.getByLabel('Categoria *', { exact: true }).selectOption('1')
+  await page.getByRole('textbox', { name: 'Nome do produto', exact: true }).fill('Café novo')
+  await page.getByRole('textbox', { name: 'Código de barras', exact: true }).fill('000987')
+  await page.getByRole('combobox', { name: 'Categoria', exact: true }).selectOption('1')
+  await preencherFiscalObrigatorio(page)
   const image = await page.evaluate(() => {
     const canvas = document.createElement('canvas')
     canvas.width = 2; canvas.height = 2
@@ -128,7 +135,7 @@ test('modal confirma descarte e mantém foco dentro do diálogo', async ({ page 
   await page.goto('/')
   await page.screenshot({ path: test.info().outputPath('catalogo.png'), fullPage: true })
   await page.getByRole('button', { name: 'Novo produto', exact: true }).click()
-  await page.getByLabel('Nome do produto *', { exact: true }).fill('Produto pendente')
+  await page.getByRole('textbox', { name: 'Nome do produto', exact: true }).fill('Produto pendente')
   page.once('dialog', dialog => dialog.dismiss())
   await page.getByRole('button', { name: 'Cancelar', exact: true }).click()
   await expect(page.getByRole('dialog')).toBeVisible()
@@ -143,8 +150,8 @@ test('layout móvel não transborda a página e permite preencher modal', async 
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true)
   await page.screenshot({ path: test.info().outputPath('catalogo.png'), fullPage: true })
   await page.getByRole('button', { name: 'Novo produto', exact: true }).click()
-  await expect(page.getByLabel('Nome do produto *', { exact: true })).toBeVisible()
-  await expect(page.getByLabel('Unidade de medida *', { exact: true })).toBeVisible()
+  await expect(page.getByRole('textbox', { name: 'Nome do produto', exact: true })).toBeVisible()
+  await expect(page.getByRole('combobox', { name: 'Unidade de medida', exact: true })).toBeVisible()
 })
 
 test('cria categoria dentro do produto, seleciona e preserva os dados preenchidos', async ({ page }) => {
@@ -156,8 +163,8 @@ test('cria categoria dentro do produto, seleciona e preserva os dados preenchido
   await page.goto('/')
   await page.getByRole('button', { name: 'Novo produto', exact: true }).click()
   const productDialog = page.getByRole('dialog', { name: 'Novo produto', exact: true })
-  await productDialog.getByLabel('Nome do produto *', { exact: true }).fill('Suco de uva')
-  await productDialog.getByLabel('Código de barras *', { exact: true }).fill('000456')
+  await productDialog.getByRole('textbox', { name: 'Nome do produto', exact: true }).fill('Suco de uva')
+  await productDialog.getByRole('textbox', { name: 'Código de barras', exact: true }).fill('000456')
   await productDialog.getByLabel('Marca', { exact: true }).fill('Marca teste')
   await productDialog.getByLabel('Controla lote').check()
   await productDialog.getByRole('button', { name: 'Nova categoria', exact: true }).click()
@@ -167,11 +174,12 @@ test('cria categoria dentro do produto, seleciona e preserva os dados preenchido
   expect(calls.filter(c => c.path === '/api/produtos' && c.method === 'POST')).toHaveLength(0)
   await categoryDialog.getByRole('button', { name: 'Salvar categoria', exact: true }).click()
   await expect(categoryDialog).toHaveCount(0)
-  await expect(productDialog.getByLabel('Categoria *', { exact: true })).toHaveValue('2')
-  await expect(productDialog.getByLabel('Nome do produto *', { exact: true })).toHaveValue('Suco de uva')
-  await expect(productDialog.getByLabel('Código de barras *', { exact: true })).toHaveValue('000456')
+  await expect(productDialog.getByRole('combobox', { name: 'Categoria', exact: true })).toHaveValue('2')
+  await expect(productDialog.getByRole('textbox', { name: 'Nome do produto', exact: true })).toHaveValue('Suco de uva')
+  await expect(productDialog.getByRole('textbox', { name: 'Código de barras', exact: true })).toHaveValue('000456')
   await expect(productDialog.getByLabel('Marca', { exact: true })).toHaveValue('Marca teste')
   await expect(productDialog.getByRole('button', { name: 'Nova categoria', exact: true })).toBeFocused()
+  await preencherFiscalObrigatorio(page)
   await productDialog.getByRole('button', { name: 'Salvar produto', exact: true }).click()
   await expect(productDialog).toHaveCount(0)
   expect(calls.find(c => c.path === '/api/produtos' && c.method === 'POST')?.body).toMatchObject({
@@ -182,12 +190,12 @@ test('Escape fecha somente o cadastro de categoria e mantém o produto aberto', 
   await mockApi(page)
   await page.goto('/')
   await page.getByRole('button', { name: 'Novo produto', exact: true }).click()
-  await page.getByLabel('Nome do produto *', { exact: true }).fill('Produto em andamento')
+  await page.getByRole('textbox', { name: 'Nome do produto', exact: true }).fill('Produto em andamento')
   await page.getByRole('button', { name: 'Nova categoria', exact: true }).click()
   await page.keyboard.press('Escape')
   await expect(page.getByRole('dialog', { name: 'Nova categoria', exact: true })).toHaveCount(0)
   await expect(page.getByRole('dialog', { name: 'Novo produto', exact: true })).toBeVisible()
-  await expect(page.getByLabel('Nome do produto *', { exact: true })).toHaveValue('Produto em andamento')
+  await expect(page.getByRole('textbox', { name: 'Nome do produto', exact: true })).toHaveValue('Produto em andamento')
 })
 test('categoria duplicada mantém preenchimento e permite cancelar sem alterar seleção do produto', async ({ page }) => {
   await mockApi(page)
@@ -199,8 +207,8 @@ test('categoria duplicada mantém preenchimento e permite cancelar sem alterar s
   })
   await page.goto('/')
   await page.getByRole('button', { name: 'Novo produto', exact: true }).click()
-  await page.getByLabel('Nome do produto *', { exact: true }).fill('Produto pendente')
-  await page.getByLabel('Categoria *', { exact: true }).selectOption('1')
+  await page.getByRole('textbox', { name: 'Nome do produto', exact: true }).fill('Produto pendente')
+  await page.getByRole('combobox', { name: 'Categoria', exact: true }).selectOption('1')
   await page.getByRole('button', { name: 'Nova categoria', exact: true }).click()
   const dialog = page.getByRole('dialog', { name: 'Nova categoria', exact: true })
   await dialog.getByLabel('Nome da categoria *', { exact: true }).fill('Mercearia')
@@ -211,14 +219,14 @@ test('categoria duplicada mantém preenchimento e permite cancelar sem alterar s
   page.once('dialog', confirm => confirm.accept())
   await dialog.getByRole('button', { name: 'Cancelar', exact: true }).click()
   await expect(dialog).toHaveCount(0)
-  await expect(page.getByLabel('Categoria *', { exact: true })).toHaveValue('1')
-  await expect(page.getByLabel('Nome do produto *', { exact: true })).toHaveValue('Produto pendente')
+  await expect(page.getByRole('combobox', { name: 'Categoria', exact: true })).toHaveValue('1')
+  await expect(page.getByRole('textbox', { name: 'Nome do produto', exact: true })).toHaveValue('Produto pendente')
 })
 test('funcionário com cadastro de produtos não pode cadastrar categorias no modal', async ({ page }) => {
   await mockApi(page, { admin: false, permissions: ['CONSULTAR', 'CADASTRAR', 'EDITAR'] })
   await page.goto('/')
   await page.getByRole('button', { name: 'Novo produto', exact: true }).click()
-  await expect(page.getByLabel('Categoria *', { exact: true })).toBeVisible()
+  await expect(page.getByRole('combobox', { name: 'Categoria', exact: true })).toBeVisible()
   await expect(page.getByRole('button', { name: 'Nova categoria', exact: true })).toHaveCount(0)
 })
 test('cadastro de categoria no produto funciona em tela móvel', async ({ page }) => {
@@ -244,10 +252,11 @@ test('produto tem seções contínuas com scroll e leva o foco ao erro fiscal', 
     await expect(dialog.getByRole('heading', { name, exact: true })).toBeVisible()
   }
   expect(await dialog.locator('.modal-body').evaluate(element => element.scrollHeight > element.clientHeight)).toBe(true)
-  await page.getByLabel('Nome do produto *', { exact: true }).fill('Café com dados fiscais')
-  await page.getByLabel('Código de barras *', { exact: true }).fill('000987')
-  await page.getByLabel('Categoria *', { exact: true }).selectOption('1')
-  const ncm = dialog.getByLabel('NCM', { exact: true })
+  await page.getByRole('textbox', { name: 'Nome do produto', exact: true }).fill('Café com dados fiscais')
+  await page.getByRole('textbox', { name: 'Código de barras', exact: true }).fill('000987')
+  await page.getByRole('combobox', { name: 'Categoria', exact: true }).selectOption('1')
+  await preencherFiscalObrigatorio(page)
+  const ncm = dialog.getByRole('textbox', { name: 'NCM', exact: true })
   await ncm.fill('0901210')
   await dialog.getByRole('button', { name: 'Salvar produto', exact: true }).click()
   await expect(ncm).toBeFocused()
@@ -260,15 +269,17 @@ test('NCM e CEST são formatados ao digitar e enviados somente com dígitos', as
   const calls = await mockApi(page)
   await page.goto('/')
   await page.getByRole('button', { name: 'Novo produto', exact: true }).click()
-  await page.getByLabel('Nome do produto *', { exact: true }).fill('Café fiscal')
-  await page.getByLabel('Código de barras *', { exact: true }).fill('00000999')
-  await page.getByLabel('Categoria *', { exact: true }).selectOption('1')
-  const ncm = page.getByLabel('NCM', { exact: true })
+  await page.getByRole('textbox', { name: 'Nome do produto', exact: true }).fill('Café fiscal')
+  await page.getByRole('textbox', { name: 'Código de barras', exact: true }).fill('00000999')
+  await page.getByRole('combobox', { name: 'Categoria', exact: true }).selectOption('1')
+  const ncm = page.getByRole('textbox', { name: 'NCM', exact: true })
   const cest = page.getByLabel('CEST', { exact: true })
   await ncm.pressSequentially('09012100')
   await expect(ncm).toHaveValue('0901.21.00')
   await cest.pressSequentially('0100100')
   await expect(cest).toHaveValue('01.001.00')
+  await page.getByRole('textbox', { name: 'CFOP padrão', exact: true }).fill('5102')
+  await page.getByRole('combobox', { name: 'Situação tributária de ICMS', exact: true }).selectOption('102')
   // Apagar ao lado de um separador não pode prender o cursor.
   await ncm.evaluate((input: HTMLInputElement) => { input.focus(); input.setSelectionRange(5, 5) })
   await ncm.press('Backspace')
@@ -278,17 +289,17 @@ test('NCM e CEST são formatados ao digitar e enviados somente com dígitos', as
   await page.getByRole('button', { name: 'Salvar produto', exact: true }).click()
   await expect(page.getByRole('dialog')).toHaveCount(0)
   expect(calls.find(c => c.path === '/api/produtos' && c.method === 'POST')?.body).toMatchObject({
-    codigoBarras: '00000999', dadosFiscais: { ncm: '09012100', cest: '0100100' },
+    codigoBarras: '00000999', dadosFiscais: { ...fiscalObrigatorio, cest: '0100100' },
   })
 })
 test('edição carrega máscaras fiscais e permite limpar dados opcionais', async ({ page }) => {
   const calls = await mockApi(page)
   await page.route('**/api/produtos/1', route => route.request().method() === 'GET'
-    ? route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ ...produto, dadosFiscais: { ncm: '09012100', cest: '0100100' } }) })
+    ? route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ ...produto, dadosFiscais: { ...fiscalObrigatorio, cest: '0100100' } }) })
     : route.fallback())
   await page.goto('/')
   await page.getByRole('button', { name: 'Editar ' + produto.nome, exact: true }).click()
-  await expect(page.getByLabel('NCM', { exact: true })).toHaveValue('0901.21.00')
+  await expect(page.getByRole('textbox', { name: 'NCM', exact: true })).toHaveValue('0901.21.00')
   await expect(page.getByLabel('CEST', { exact: true })).toHaveValue('01.001.00')
   await page.getByLabel('CEST', { exact: true }).fill('')
   await page.getByRole('button', { name: 'Salvar produto', exact: true }).click()
@@ -302,10 +313,11 @@ test('situação de ICMS lista os códigos solicitados e salva CSOSN', async ({ 
   const calls = await mockApi(page)
   await page.goto('/')
   await page.getByRole('button', { name: 'Novo produto', exact: true }).click()
-  await page.getByLabel('Nome do produto *', { exact: true }).fill('Produto ICMS')
-  await page.getByLabel('Código de barras *', { exact: true }).fill('0000101')
-  await page.getByLabel('Categoria *', { exact: true }).selectOption('1')
-  const select = page.getByLabel('Situação tributária de ICMS', { exact: true })
+  await page.getByRole('textbox', { name: 'Nome do produto', exact: true }).fill('Produto ICMS')
+  await page.getByRole('textbox', { name: 'Código de barras', exact: true }).fill('0000101')
+  await page.getByRole('combobox', { name: 'Categoria', exact: true }).selectOption('1')
+  await preencherFiscalObrigatorio(page)
+  const select = page.getByRole('combobox', { name: 'Situação tributária de ICMS', exact: true })
   expect(await select.locator('option').evaluateAll(options => options.map(option => (option as HTMLOptionElement).value))).toEqual([
     '', '101', '102', '103', '201', '202', '203', '300', '400', '500', '60',
   ])
@@ -317,17 +329,17 @@ test('situação de ICMS lista os códigos solicitados e salva CSOSN', async ({ 
     dadosFiscais: { icmsCst: null, icmsCsosn: '101' },
   })
 })
-for (const [inicial, selecionado] of [['102', '60'], ['60', '500'], ['60', '']] as const) {
+for (const [inicial, selecionado] of [['102', '60'], ['60', '500']] as const) {
   test('edição de ICMS troca ' + inicial + ' por ' + (selecionado || 'não informado'), async ({ page }) => {
     const calls = await mockApi(page)
     await page.route('**/api/produtos/1', route => route.request().method() === 'GET'
       ? route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({
-          ...produto, dadosFiscais: { ncm: '09012100', icmsCst: inicial.length === 2 ? inicial : null, icmsCsosn: inicial.length === 3 ? inicial : null },
+          ...produto, dadosFiscais: { ...fiscalObrigatorio, icmsCst: inicial.length === 2 ? inicial : null, icmsCsosn: inicial.length === 3 ? inicial : null },
         }) })
       : route.fallback())
     await page.goto('/')
     await page.getByRole('button', { name: 'Editar ' + produto.nome, exact: true }).click()
-    const select = page.getByLabel('Situação tributária de ICMS', { exact: true })
+    const select = page.getByRole('combobox', { name: 'Situação tributária de ICMS', exact: true })
     await expect(select).toHaveValue(inicial)
     await select.selectOption(selecionado)
     await page.getByRole('button', { name: 'Salvar produto', exact: true }).click()
@@ -364,5 +376,138 @@ test('prévia maior aparece ao selecionar imagem e sai ao cancelar, sem salvar p
   await page.screenshot({ path: test.info().outputPath('produto-preview-compacto.png') })
   await page.getByRole('button', { name: 'Cancelar seleção', exact: true }).click()
   await expect(preview).toHaveCount(0)
-  await expect(page.getByLabel('Nome do produto *', { exact: true })).toHaveValue('')
+  await expect(page.getByRole('textbox', { name: 'Nome do produto', exact: true })).toHaveValue('')
+})
+
+for (const [label, role] of [
+  ['Nome do produto', 'textbox'], ['Categoria', 'combobox'], ['CFOP padrão', 'textbox'],
+  ['NCM', 'textbox'], ['Situação tributária de ICMS', 'combobox'],
+] as const) {
+  test('não salva produto com obrigatório vazio: ' + label, async ({ page }) => {
+    const calls = await mockApi(page)
+    await page.goto('/')
+    await page.getByRole('button', { name: 'Novo produto', exact: true }).click()
+    await page.getByRole('textbox', { name: 'Nome do produto', exact: true }).fill('Produto completo')
+    await page.getByRole('textbox', { name: 'Código de barras', exact: true }).fill('000123')
+    await page.getByRole('combobox', { name: 'Categoria', exact: true }).selectOption('1')
+    await preencherFiscalObrigatorio(page)
+    const campo = page.getByRole(role, { name: label, exact: true })
+    await expect(campo).toHaveAttribute('aria-required', 'true')
+    expect(await campo.evaluate(input => {
+      const label = (input as HTMLInputElement).labels?.[0]
+      const marker = label?.querySelector('.required-indicator')
+      return marker ? getComputedStyle(marker).color : null
+    })).toBe('rgb(180, 35, 24)')
+    if (role === 'combobox') await campo.selectOption('')
+    else await campo.fill('')
+    await page.getByRole('button', { name: 'Salvar produto', exact: true }).click()
+    await expect(campo).toBeFocused()
+    await expect(campo).toHaveAttribute('aria-invalid', 'true')
+    await expect(page.getByRole('alert')).toHaveCount(1)
+    expect(calls.filter(c => c.method === 'POST' && c.path === '/api/produtos')).toHaveLength(0)
+    if (label !== 'Nome do produto') await expect(page.getByRole('textbox', { name: 'Nome do produto', exact: true })).toHaveValue('Produto completo')
+    if (label === 'Situação tributária de ICMS') {
+      await page.screenshot({ path: test.info().outputPath('produto-obrigatorios.png') })
+    }
+  })
+}
+test('edição de produto antigo exige completar os dados fiscais antes de salvar', async ({ page }) => {
+  const calls = await mockApi(page)
+  await page.route('**/api/produtos/1', route => route.request().method() === 'GET'
+    ? route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ ...produto, dadosFiscais: null }) })
+    : route.fallback())
+  await page.goto('/')
+  await page.getByRole('button', { name: 'Editar ' + produto.nome, exact: true }).click()
+  await page.getByRole('button', { name: 'Salvar produto', exact: true }).click()
+  await expect(page.getByRole('alert')).toHaveCount(3)
+  expect(calls.filter(c => c.method === 'PUT')).toHaveLength(0)
+  await preencherFiscalObrigatorio(page)
+  await page.getByRole('button', { name: 'Salvar produto', exact: true }).click()
+  await expect(page.getByRole('dialog')).toHaveCount(0)
+  expect(calls.filter(c => c.method === 'PUT')).toHaveLength(1)
+})
+
+for (const permitidoParaMenores of [false, true]) {
+  test('categoria no produto persiste a opção permitidoParaMenores=' + permitidoParaMenores, async ({ page }) => {
+    const calls = await mockApi(page)
+    let enviado: Record<string, unknown> | undefined
+    await page.route('**/api/categorias', route => {
+      if (route.request().method() !== 'POST') return route.fallback()
+      enviado = route.request().postDataJSON()
+      return route.fulfill({ status: 201, contentType: 'application/json', body: JSON.stringify({
+        ...categoria, ...enviado, id: 2,
+      }) })
+    })
+    await page.goto('/')
+    await page.getByRole('button', { name: 'Novo produto', exact: true }).click()
+    await page.getByRole('textbox', { name: 'Nome do produto', exact: true }).fill('Produto em andamento')
+    await page.getByRole('button', { name: 'Nova categoria', exact: true }).click()
+    const dialog = page.getByRole('dialog', { name: 'Nova categoria', exact: true })
+    const checkbox = dialog.getByRole('checkbox', { name: /Proibida para menores de 18 anos/ })
+    await expect(checkbox).not.toBeChecked()
+    await checkbox.setChecked(!permitidoParaMenores)
+    await dialog.getByLabel('Nome da categoria *', { exact: true }).fill(permitidoParaMenores ? 'Alimentos' : 'Bebidas alcoólicas')
+    await dialog.getByRole('button', { name: 'Salvar categoria', exact: true }).click()
+    await expect(dialog).toHaveCount(0)
+    expect(enviado?.permitidoParaMenores).toBe(permitidoParaMenores)
+    await expect(page.getByRole('combobox', { name: 'Categoria', exact: true })).toHaveValue('2')
+    await expect(page.getByRole('textbox', { name: 'Nome do produto', exact: true })).toHaveValue('Produto em andamento')
+    expect(calls.filter(c => c.path === '/api/produtos' && c.method === 'POST')).toHaveLength(0)
+  })
+}
+test('edição de categoria livre carrega desmarcada e permite restringir', async ({ page }) => {
+  await mockApi(page)
+  let enviado: Record<string, unknown> | undefined
+  await page.route('**/api/categorias**', route => {
+    const request = route.request()
+    if (request.method() === 'PUT') {
+      enviado = request.postDataJSON()
+      return route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({
+        ...categoria, ...enviado, versao: 1,
+      }) })
+    }
+    if (request.method() === 'GET') return route.fulfill({
+      status: 200, contentType: 'application/json',
+      body: JSON.stringify({ itens: [{ ...categoria, permitidoParaMenores: true }], total: 1, pagina: 0, tamanho: 20 }),
+    })
+    return route.fallback()
+  })
+  await page.goto('/')
+  await page.getByRole('button', { name: 'Categorias', exact: true }).click()
+  await page.getByRole('button', { name: 'Editar Mercearia', exact: true }).click()
+  const dialog = page.getByRole('dialog', { name: 'Editar categoria', exact: true })
+  const checkbox = dialog.getByRole('checkbox', { name: /Proibida para menores de 18 anos/ })
+  await expect(checkbox).not.toBeChecked()
+  await checkbox.check()
+  await dialog.getByRole('button', { name: 'Salvar categoria', exact: true }).click()
+  await expect(dialog).toHaveCount(0)
+  expect(enviado).toMatchObject({ nome: 'Mercearia', permitidoParaMenores: false, versao: 0 })
+})
+
+test('edição de categoria restrita carrega marcada e permite liberar para menores', async ({ page }) => {
+  await mockApi(page)
+  let enviado: Record<string, unknown> | undefined
+  await page.route('**/api/categorias**', route => {
+    if (route.request().method() === 'PUT') {
+      enviado = route.request().postDataJSON()
+      return route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({
+        ...categoria, ...enviado, versao: 1,
+      }) })
+    }
+    if (route.request().method() === 'GET') return route.fulfill({
+      status: 200, contentType: 'application/json',
+      body: JSON.stringify({ itens: [{ ...categoria, permitidoParaMenores: false }], total: 1, pagina: 0, tamanho: 20 }),
+    })
+    return route.fallback()
+  })
+  await page.goto('/')
+  await page.getByRole('button', { name: 'Categorias', exact: true }).click()
+  await page.getByRole('button', { name: 'Editar Mercearia', exact: true }).click()
+  const dialog = page.getByRole('dialog', { name: 'Editar categoria', exact: true })
+  const checkbox = dialog.getByRole('checkbox', { name: /Proibida para menores de 18 anos/ })
+  await expect(checkbox).toBeChecked()
+  await checkbox.uncheck()
+  await dialog.getByRole('button', { name: 'Salvar categoria', exact: true }).click()
+  await expect(dialog).toHaveCount(0)
+  expect(enviado).toMatchObject({ nome: 'Mercearia', permitidoParaMenores: true, versao: 0 })
 })

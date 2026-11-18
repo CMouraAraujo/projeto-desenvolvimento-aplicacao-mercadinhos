@@ -47,10 +47,11 @@ export function Modal({ title, subtitle, children, onClose, busy = false, classN
     <header className="modal-header"><div><span className="eyebrow">CATÁLOGO</span><h2 id={titleId}>{title}</h2>{subtitle && <p id={subtitleId}>{subtitle}</p>}</div><button type="button" className="icon-button" aria-label="Fechar" disabled={busy} onClick={onClose}><Icon name="close"/></button></header>{children}
   </dialog>
 }
-export function Field({ label, error, children, hint }: { label: string; error?: string; children: ReactElement; hint?: string }) {
+export function Field({ label, error, children, hint, required = false }: { label: string; error?: string; children: ReactElement; hint?: string; required?: boolean }) {
   const id = useId()
   const descriptions = [error ? id + '-error' : '', hint ? id + '-hint' : ''].filter(Boolean).join(' ')
-  return <div className={'field' + (error ? ' invalid' : '')}><label htmlFor={id}>{label}</label>{cloneElement(children as ReactElement<{ id: string; 'aria-describedby'?: string; 'aria-invalid'?: boolean }>, {
+  return <div className={'field' + (error ? ' invalid' : '')}><label htmlFor={id}>{label}{required && <span className="required-indicator" aria-hidden="true"> *</span>}</label>{cloneElement(children as ReactElement<{ id: string; 'aria-describedby'?: string; 'aria-invalid'?: boolean; required?: boolean; 'aria-required'?: boolean }>, {
     id, 'aria-describedby': descriptions || undefined, 'aria-invalid': !!error,
+    ...(required ? { required: true, 'aria-required': true } : {}),
   })}{error && <small id={id + '-error'} role="alert">{error}</small>}{hint && <small id={id + '-hint'} className="hint">{hint}</small>}</div>
 }

@@ -30,8 +30,8 @@ export const catalogo = {
     } while (itens.length < total)
     return itens
   },
-  salvarCategoria: (nome: string, atual?: Categoria) => atual
-    ? request<Categoria>('/categorias/' + atual.id, json('PUT', { nome, versao: atual.versao }))
-    : request<Categoria>('/categorias', json('POST', { nome })),
+  salvarCategoria: (nome: string, permitidoParaMenores: boolean, atual?: Categoria) => atual
+    ? request<Categoria>('/categorias/' + atual.id, json('PUT', { nome, permitidoParaMenores, versao: atual.versao }))
+    : request<Categoria>('/categorias', json('POST', { nome, permitidoParaMenores })),
   situacaoCategoria: (categoria: Categoria) => request<Categoria>('/categorias/' + categoria.id + '/situacao', json('PATCH', { versao: categoria.versao, ativa: !categoria.ativa })),
 }

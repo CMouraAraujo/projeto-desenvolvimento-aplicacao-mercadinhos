@@ -22,6 +22,7 @@ class Produto {
     @Column(name = "permite_venda_fracionada", nullable = false) private boolean permiteVendaFracionada;
     @Column(name = "controla_lote", nullable = false) private boolean controlaLote;
     @Column(name = "controla_validade", nullable = false) private boolean controlaValidade;
+    @Column(name = "permitido_para_menores", nullable = false) private boolean permitidoParaMenores;
     @Column(nullable = false) private boolean ativo = true;
     @Version @Column(nullable = false) private long versao;
     @Column(name = "imagem_chave", length = 40) private String imagemChave;
@@ -31,17 +32,18 @@ class Produto {
     @Column(name = "criado_por", nullable = false, updatable = false) private Long criadoPor;
     @Column(name = "atualizado_por", nullable = false) private Long atualizadoPor;
 
-    Produto(Long organizacaoId, DadosProduto dados, Long autor) {
+    Produto(Long organizacaoId, DadosProduto dados, Long autor, boolean permitidoParaMenores) {
         this.organizacaoId = organizacaoId;
         criadoPor = autor;
         criadoEm = Instant.now();
-        preencher(dados, autor);
+        preencher(dados, autor, permitidoParaMenores);
     }
 
-    void preencher(DadosProduto dados, Long autor) {
+    void preencher(DadosProduto dados, Long autor, boolean permitidoParaMenores) {
         nome = NomesCategoria.normalizar(dados.nome());
         codigoBarras = dados.codigoBarras();
         categoriaId = dados.categoriaId();
+        this.permitidoParaMenores = permitidoParaMenores;
         unidadeMedida = dados.unidadeMedida();
         descricao = limpar(dados.descricao());
         marca = limpar(dados.marca());

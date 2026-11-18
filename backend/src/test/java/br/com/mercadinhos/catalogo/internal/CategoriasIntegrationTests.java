@@ -203,7 +203,7 @@ class CategoriasIntegrationTests {
         var contexto = SecurityContextHolder.createEmptyContext();
         contexto.setAuthentication(UsernamePasswordAuthenticationToken.authenticated(editor, null, editor.getAuthorities()));
         SecurityContextHolder.setContext(contexto);
-        assertThatThrownBy(() -> servico.cadastrar(new NovaCategoria("Proibida")))
+        assertThatThrownBy(() -> servico.cadastrar(new NovaCategoria("Proibida", false)))
                 .isInstanceOf(org.springframework.security.access.AccessDeniedException.class);
     }
 
@@ -271,6 +271,47 @@ class CategoriasIntegrationTests {
                 .andExpect(status().isOk()).andExpect(jsonPath("$.versao").value(1));
     }
 
+    @Test
+    void classificacaoParaMenoresTemPadraoLivreEPodeSerAlteradaComVersao() throws Exception {
+        criar(admin, "Sem classificação").andExpect(status().isCreated())
+                .andExpect(jsonPath("$.permitidoParaMenores").value(true));
+        String body = enviar(admin, post("/api/categorias"), Map.of("nome", "Livre", "permitidoParaMenores", true))
+                .andExpect(status().isCreated()).andExpect(jsonPath("$.permitidoParaMenores").value(true))
+                .andReturn().getResponse().getContentAsString();
+        long id = ((Number) JsonPath.read(body, "$.id")).longValue();
+        editar(admin, id, 0, "Livre renomeada").andExpect(status().isOk())
+                .andExpect(jsonPath("$.permitidoParaMenores").value(true));
+        enviar(admin, put("/api/categorias/" + id), Map.of("nome", "Livre renomeada", "versao", 1, "permitidoParaMenores", false))
+                .andExpect(status().isOk()).andExpect(jsonPath("$.permitidoParaMenores").value(false))
+                .andExpect(jsonPath("$.versao").value(2));
+        enviar(admin, put("/api/categorias/" + id), Map.of("nome", "Livre renomeada", "versao", 1, "permitidoParaMenores", true))
+                .andExpect(status().isConflict());
+        assertThat(jdbc.queryForObject("SELECT permitido_para_menores FROM categorias WHERE id = ?", Boolean.class, id)).isFalse();
+    }
+
+    @Test
+    void classificacaoNaoPodeSerAlteradaPorFuncionarioOuOutraOrganizacao() throws Exception {
+        String body = enviar(admin, post("/api/categorias"), Map.of("nome", "Protegida", "permitidoParaMenores", true))
+                .andExpect(status().isCreated()).andReturn().getResponse().getContentAsString();
+        long id = ((Number) JsonPath.read(body, "$.id")).longValue();
+        var dados = Map.of("nome", "Protegida", "versao", 0, "permitidoParaMenores", false);
+        enviar(editor, put("/api/categorias/" + id), dados).andExpect(status().isForbidden());
+        enviar(outroAdmin, put("/api/categorias/" + id), dados).andExpect(status().isNotFound());
+        mvc.perform(put("/api/categorias/" + id).with(user(admin)).contentType(MediaType.APPLICATION_JSON)
+                .content(json.writeValueAsString(dados))).andExpect(status().isForbidden());
+        assertThat(jdbc.queryForObject("SELECT permitido_para_menores FROM categorias WHERE id = ?", Boolean.class, id)).isTrue();
+        assertThat(jdbc.queryForObject("SELECT versao FROM categorias WHERE id = ?", Long.class, id)).isZero();
+    }
+
+    @Test
+    void classificacoesConcorrentesNaoSobrescrevemAVersaoAtual() throws Exception {
+        long id = criarId(admin, "Concorrente classificação");
+        var codigos = concorrer(() -> enviar(admin, put("/api/categorias/" + id),
+                Map.of("nome", "Concorrente classificação", "versao", 0, "permitidoParaMenores", true))
+                .andReturn().getResponse().getStatus());
+        assertThat(codigos).containsExactlyInAnyOrder(200, 409);
+        assertThat(jdbc.queryForObject("SELECT permitido_para_menores FROM categorias WHERE id = ?", Boolean.class, id)).isTrue();
+    }
     private List<Integer> concorrer(Callable<Integer> chamada) throws Exception {
         var inicio = new CountDownLatch(1);
         Callable<Integer> tarefa = () -> { inicio.await(); return chamada.call(); };
