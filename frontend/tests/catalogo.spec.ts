@@ -41,6 +41,8 @@ async function preencherFiscalObrigatorio(page: Page) {
 test('login usa formulário e renova CSRF para logout; limpa a tela privada', async ({ page }) => {
   const calls = await mockApi(page, { authenticated: false })
   await page.goto('/')
+  await page.getByRole('heading', { name: 'Entre no seu espaço' }).waitFor()
+  await page.screenshot({ path: test.info().outputPath('login-identidade-visual.png'), fullPage: true })
   await page.getByLabel('E-mail', { exact: true }).fill('ana@example.com')
   await page.getByLabel('Senha', { exact: true }).fill('SenhaSegura123')
   await page.getByRole('button', { name: 'Entrar', exact: true }).click()
@@ -107,6 +109,7 @@ test('upload com falha permite tentar novamente sem cadastrar outro produto', as
       : route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ ...produto, imagemUrl: '/api/produtos/1/imagem', versao: 4 }) })
   })
   await page.goto('/')
+  await expect(page.getByText(produto.nome, { exact: true })).toBeVisible()
   await page.screenshot({ path: test.info().outputPath('catalogo.png'), fullPage: true })
   await page.getByRole('button', { name: 'Novo produto', exact: true }).click()
   await page.getByRole('textbox', { name: 'Nome do produto', exact: true }).fill('Café novo')
@@ -133,6 +136,7 @@ test('upload com falha permite tentar novamente sem cadastrar outro produto', as
 test('modal confirma descarte e mantém foco dentro do diálogo', async ({ page }) => {
   await mockApi(page)
   await page.goto('/')
+  await expect(page.getByText(produto.nome, { exact: true })).toBeVisible()
   await page.screenshot({ path: test.info().outputPath('catalogo.png'), fullPage: true })
   await page.getByRole('button', { name: 'Novo produto', exact: true }).click()
   await page.getByRole('textbox', { name: 'Nome do produto', exact: true }).fill('Produto pendente')
@@ -360,7 +364,7 @@ test('prévia maior aparece ao selecionar imagem e sai ao cancelar, sem salvar p
     const canvas = document.createElement('canvas')
     canvas.width = 20; canvas.height = 20
     const ctx = canvas.getContext('2d')!
-    ctx.fillStyle = '#216c51'; ctx.fillRect(0, 0, 20, 20)
+    ctx.fillStyle = '#ff6400'; ctx.fillRect(0, 0, 20, 20)
     return canvas.toDataURL('image/png').split(',')[1]
   })
   await page.getByLabel('Selecionar imagem', { exact: true }).setInputFiles({

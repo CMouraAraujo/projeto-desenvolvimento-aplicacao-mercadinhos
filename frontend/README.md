@@ -70,3 +70,9 @@ O modal de categoria, inclusive quando aberto dentro do produto, contém a check
 A API persiste permitidoParaMenores na categoria e copia o valor para o produto ao cadastrá-lo ou trocar de categoria. Alterar a classificação da categoria ou editar um produto mantendo a categoria não reclassifica produtos existentes. Essa cópia permite evolução futura; ainda não existe verificação de idade ou bloqueio de venda.
 
 A migration V6 do backend cria permitido_para_menores BOOLEAN NOT NULL DEFAULT FALSE nas tabelas categorias e produtos. A V7 muda o padrão de novos registros para TRUE, sem inverter classificações existentes. Reinicie o backend atualizado para aplicar as migrations antes de usar a checkbox. Registros anteriores conservam os valores já salvos.
+
+## Identidade visual
+
+A paleta institucional é definida por variáveis CSS em src/styles.css: laranja #FF6400, grafite #232323 e branco #FFFFFF. Os tons de apoio usam cinzas neutros e variações de laranja para bordas, fundos, hover e foco. Navegação e painel de apresentação do login usam grafite; o conteúdo usa superfícies claras.
+
+Botões primários combinam fundo laranja com texto grafite para legibilidade. Descrições e textos pequenos usam cinzas de maior contraste. Erros e asteriscos obrigatórios mantêm vermelho semântico. O layout compacto dos formulários, a rolagem interna e a navegação por teclado permanecem disponíveis.
