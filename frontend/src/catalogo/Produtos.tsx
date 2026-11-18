@@ -1,4 +1,4 @@
-import { useState, type FormEvent } from 'react'
+import { useEffect, useState, type FormEvent } from 'react'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { useAuth } from '../auth/Auth'
 import type { Produto } from '../shared/types'
@@ -14,13 +14,20 @@ export function Produtos() {
   const [categoriaId, setCategoria] = useState('')
   const [ativo, setAtivo] = useState('')
   const [pagina, setPagina] = useState(0)
+  const [tamanho, setTamanho] = useState(10)
   const [modal, setModal] = useState<number | 'novo' | null>(null)
   const [error, setError] = useState<unknown>(null)
   const [notice, setNotice] = useState('')
   const [changing, setChanging] = useState<number | null>(null)
-  const filtros = { pagina, tamanho: 20, busca, categoriaId, ativo }
+  const filtros = { pagina, tamanho, busca, categoriaId, ativo }
   const produtos = useQuery({ queryKey: ['produtos', filtros], queryFn: ({ signal }) => catalogo.produtos(filtros, signal) })
   const categorias = useQuery({ queryKey: ['categorias', 'seletor'], queryFn: ({ signal }) => catalogo.todasCategorias(signal) })
+  useEffect(() => {
+    if (produtos.data) {
+      const ultimaPagina = Math.max(0, Math.ceil(produtos.data.total / tamanho) - 1)
+      if (pagina > ultimaPagina) setPagina(ultimaPagina)
+    }
+  }, [produtos.data, pagina, tamanho])
   const categoryName = (id: number) => categorias.data?.find(c => c.id === id)?.nome ?? 'Categoria #' + id
   const search = (event: FormEvent) => { event.preventDefault(); setBusca(buscaInput.trim()); setPagina(0) }
   async function situacao(produto: Produto) {
@@ -55,8 +62,8 @@ export function Produtos() {
           <td className="code">{produto.codigoBarras}</td><td>{categoryName(produto.categoriaId)}</td><td><span className="unit">{produto.unidadeMedida}</span></td><td><Badge active={produto.ativo}/></td>
           <td><div className="row-actions"><button className="icon-button" title={can('EDITAR') ? 'Editar produto' : 'Consultar produto'} aria-label={(can('EDITAR') ? 'Editar ' : 'Consultar ') + produto.nome} onClick={() => setModal(produto.id)}><Icon name="edit" size={17}/></button>{can('INATIVAR') && <button className="text-button" disabled={changing !== null} onClick={() => void situacao(produto)}>{changing === produto.id ? 'Aguarde…' : produto.ativo ? 'Inativar' : 'Reativar'}</button>}</div></td>
         </tr>)}</tbody></table></div>}
-        <Pagination pagina={pagina} tamanho={20} total={produtos.data.total} onChange={setPagina}/>
       </>}
+      <Pagination pagina={pagina} tamanho={tamanho} total={produtos.data?.total ?? 0} onChange={setPagina} loading={produtos.isPending} onSizeChange={size => { setTamanho(size); setPagina(0) }}/>
     </section>
     <p className="page-footnote">O catálogo é compartilhado somente com os usuários autorizados da sua organização.</p>
     {modal !== null && <ProdutoModal id={modal === 'novo' ? undefined : modal} onClose={() => setModal(null)} onSaved={setNotice}/>}

@@ -28,9 +28,26 @@ export function Loading({ label = 'Carregando…' }: { label?: string }) {
 export function Badge({ active }: { active: boolean }) {
   return <span className={'badge ' + (active ? 'active' : 'inactive')}><span/>{active ? 'Ativo' : 'Inativo'}</span>
 }
-export function Pagination({ pagina, tamanho, total, onChange }: { pagina: number; tamanho: number; total: number; onChange: (page: number) => void }) {
+export function Pagination({ pagina, tamanho, total, onChange, onSizeChange, loading = false }: {
+  pagina: number; tamanho: number; total: number; onChange: (page: number) => void
+  onSizeChange: (size: number) => void; loading?: boolean
+}) {
   const pages = Math.max(1, Math.ceil(total / tamanho))
-  return <div className="pagination"><span>{total ? pagina * tamanho + 1 : 0}–{Math.min((pagina + 1) * tamanho, total)} de {total} registros</span><div><button className="button small secondary" disabled={pagina === 0} onClick={() => onChange(pagina - 1)}>Anterior</button><span aria-live="polite">{pagina + 1} / {pages}</span><button className="button small secondary" disabled={pagina + 1 >= pages} onClick={() => onChange(pagina + 1)}>Próxima</button></div></div>
+  return <div className="pagination">
+    <span role="status">{loading ? 'Carregando…' : (total ? pagina * tamanho + 1 : 0) + '–' + Math.min((pagina + 1) * tamanho, total) + ' de ' + total + ' registros'}</span>
+    <div className="pagination-controls">
+      <label className="pagination-size">Itens por página
+        <select value={tamanho} onChange={event => onSizeChange(Number(event.target.value))}>
+          {[10, 25, 50].map(size => <option key={size} value={size}>{size}</option>)}
+        </select>
+      </label>
+      <nav className="pagination-pages" aria-label="Paginação da listagem">
+        <button className="button small secondary" disabled={loading || pagina === 0} onClick={() => onChange(pagina - 1)}>Anterior</button>
+        <span aria-live="polite">{loading ? '…' : pagina + 1 + ' / ' + pages}</span>
+        <button className="button small secondary" disabled={loading || pagina + 1 >= pages} onClick={() => onChange(pagina + 1)}>Próxima</button>
+      </nav>
+    </div>
+  </div>
 }
 export function Modal({ title, subtitle, children, onClose, busy = false, className = '' }: { title: string; subtitle?: string; children: ReactNode; onClose: () => void; busy?: boolean; className?: string }) {
   const titleId = useId()

@@ -21,6 +21,7 @@ Abra http://127.0.0.1:5173. O Vite encaminha /api para o backend. Use uma conta 
 - Tratamento de 401 com remoção do cache privado e retorno ao login.
 - Navegação e ações conforme as permissões efetivas.
 - Produtos: paginação no servidor, busca por nome/código, filtros por categoria/situação, consulta, cadastro, edição e ativação/inativação.
+- Painéis de Produtos e Categorias com listagem compacta e seleção de 10, 25 ou 50 itens por página (padrão 10). Trocar a quantidade retorna à primeira página e mantém os filtros; Anterior/Próxima consultam a API. Se o total diminuir, a página é ajustada para continuar no intervalo disponível.
 - No formulário de produto, nome, categoria, código de barras, unidade de medida, NCM, CFOP e situação tributária de ICMS são obrigatórios, indicados por asterisco vermelho e atributos de acessibilidade. A edição de produtos antigos sem esses dados exige completá-los antes de salvar.
 - Modal de produtos em página única com seções Geral, Operacional e Fiscal, rolagem, espaçamento compacto, validação e confirmação de descarte.
 - Prévia ampliada da imagem imediatamente após a seleção, antes de salvar; cancelar a seleção restaura a imagem anterior, quando houver. Upload/substituição/remoção da imagem com controle de versão. O upload exige EDITAR, inclusive após um cadastro feito com CADASTRAR.

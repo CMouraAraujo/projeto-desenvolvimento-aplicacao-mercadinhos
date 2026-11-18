@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { useAuth } from '../auth/Auth'
 import type { Categoria } from '../shared/types'
@@ -14,12 +14,19 @@ export function Categorias() {
   const [busca, setBusca] = useState('')
   const [ativa, setAtiva] = useState('')
   const [pagina, setPagina] = useState(0)
+  const [tamanho, setTamanho] = useState(10)
   const [modal, setModal] = useState<Categoria | 'nova' | null>(null)
   const [error, setError] = useState<unknown>(null)
   const [notice, setNotice] = useState('')
   const [busy, setBusy] = useState(false)
-  const filtros = { pagina, tamanho: 20, busca, ativa }
+  const filtros = { pagina, tamanho, busca, ativa }
   const query = useQuery({ queryKey: ['categorias', 'lista', filtros], queryFn: ({ signal }) => catalogo.categorias(filtros, signal) })
+  useEffect(() => {
+    if (query.data) {
+      const ultimaPagina = Math.max(0, Math.ceil(query.data.total / tamanho) - 1)
+      if (pagina > ultimaPagina) setPagina(ultimaPagina)
+    }
+  }, [query.data, pagina, tamanho])
   const invalidate = () => { void client.invalidateQueries({ queryKey: ['categorias'] }) }
   return <>
     <header className="page-heading"><div><span className="eyebrow">SEU CATÁLOGO</span><h1>Categorias</h1><p>A organização do seu catálogo começa por aqui.</p></div>{admin && <button className="button" onClick={() => setModal('nova')}><Icon name="plus" size={18}/>Nova categoria</button>}</header>
@@ -33,8 +40,8 @@ export function Categorias() {
           setBusy(true); setError(null)
           try { await catalogo.situacaoCategoria(c); setNotice('Situação da categoria atualizada.') } catch (err) { setError(err) } finally { setBusy(false); invalidate() }
         }}>{c.ativa ? 'Inativar' : 'Reativar'}</button></div></td>}</tr>)}</tbody></table></div>}
-        <Pagination pagina={pagina} tamanho={20} total={query.data.total} onChange={setPagina}/>
       </>}
+      <Pagination pagina={pagina} tamanho={tamanho} total={query.data?.total ?? 0} onChange={setPagina} loading={query.isPending} onSizeChange={size => { setTamanho(size); setPagina(0) }}/>
     </section><p className="page-footnote">Categorias inativas permanecem nos produtos existentes e não podem ser escolhidas em novas associações.</p>
     {modal !== null && <CategoriaModal atual={modal === 'nova' ? undefined : modal} onClose={() => setModal(null)} onSaved={() => { invalidate(); setNotice('Categoria salva com sucesso.'); setModal(null) }}/>}
   </>

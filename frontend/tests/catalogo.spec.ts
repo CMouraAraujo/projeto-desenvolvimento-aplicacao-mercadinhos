@@ -515,3 +515,87 @@ test('edição de categoria restrita carrega marcada e permite liberar para meno
   await expect(dialog).toHaveCount(0)
   expect(enviado).toMatchObject({ nome: 'Mercearia', permitidoParaMenores: true, versao: 0 })
 })
+
+for (const recurso of ['produtos', 'categorias'] as const) {
+  test('paginação de ' + recurso + ' usa 10, 25 e 50 itens no servidor e preserva filtros', async ({ page }) => {
+    await mockApi(page)
+    const pedidos: { pagina: number; tamanho: number; busca: string | null; situacao: string | null }[] = []
+    await page.route('**/api/' + recurso + '?**', route => {
+      const params = new URL(route.request().url()).searchParams
+      const pagina = Number(params.get('pagina') ?? 0)
+      const tamanho = Number(params.get('tamanho') ?? 10)
+      pedidos.push({ pagina, tamanho, busca: params.get('busca'), situacao: params.get(recurso === 'produtos' ? 'ativo' : 'ativa') })
+      const itens = Array.from({ length: 61 }, (_, index) => ({
+        ...(recurso === 'produtos' ? produto : categoria),
+        id: index + 1, nome: 'Item ' + String(index + 1).padStart(3, '0'),
+      })).slice(pagina * tamanho, (pagina + 1) * tamanho)
+      return route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ itens, total: 61, pagina, tamanho }) })
+    })
+    await page.goto('/')
+    if (recurso === 'categorias') await page.getByRole('button', { name: 'Categorias', exact: true }).click()
+    const painel = page.locator('section.panel')
+    const tamanho = painel.getByRole('combobox', { name: 'Itens por página', exact: true })
+    await expect(tamanho).toHaveValue('10')
+    expect(await tamanho.locator('option').allTextContents()).toEqual(['10', '25', '50'])
+    await expect(painel.locator('tbody tr')).toHaveCount(10)
+    await expect(painel.getByRole('status')).toHaveText('1–10 de 61 registros')
+    await expect(painel.getByRole('button', { name: 'Anterior', exact: true })).toBeDisabled()
+    await page.getByRole('textbox', { name: recurso === 'produtos' ? 'Buscar produtos' : 'Buscar categorias', exact: true }).fill('Item')
+    await page.getByRole('button', { name: 'Buscar', exact: true }).click()
+    await page.getByRole('combobox', { name: 'Filtrar situação', exact: true }).selectOption('true')
+    await expect(painel.locator('tbody tr')).toHaveCount(10)
+    await painel.getByRole('button', { name: 'Próxima', exact: true }).click()
+    await expect(painel.getByRole('status')).toHaveText('11–20 de 61 registros')
+    await tamanho.selectOption('25')
+    await expect(painel.locator('tbody tr')).toHaveCount(25)
+    await expect(painel.getByRole('status')).toHaveText('1–25 de 61 registros')
+    expect(pedidos.at(-1)).toMatchObject({ pagina: 0, tamanho: 25, busca: 'Item', situacao: 'true' })
+    await painel.getByRole('button', { name: 'Próxima', exact: true }).click()
+    await expect(painel.getByRole('status')).toHaveText('26–50 de 61 registros')
+    await tamanho.selectOption('50')
+    await expect(painel.locator('tbody tr')).toHaveCount(50)
+    await expect(painel.getByRole('status')).toHaveText('1–50 de 61 registros')
+    expect(pedidos.at(-1)).toMatchObject({ pagina: 0, tamanho: 50, busca: 'Item', situacao: 'true' })
+    await painel.getByRole('button', { name: 'Próxima', exact: true }).click()
+    await expect(painel.locator('tbody tr')).toHaveCount(11)
+    await expect(painel.getByRole('status')).toHaveText('51–61 de 61 registros')
+    await expect(painel.getByRole('button', { name: 'Próxima', exact: true })).toBeDisabled()
+    await painel.getByRole('button', { name: 'Anterior', exact: true }).click()
+    await expect(painel.getByRole('status')).toHaveText('1–50 de 61 registros')
+    await tamanho.selectOption('10')
+    await expect(painel.locator('tbody tr')).toHaveCount(10)
+    await page.evaluate(() => window.scrollTo(0, 0))
+    await page.screenshot({ path: test.info().outputPath('painel-' + recurso + '-compacto.png'), fullPage: true })
+    await page.setViewportSize({ width: 390, height: 844 })
+    expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true)
+    await tamanho.scrollIntoViewIfNeeded()
+    await expect(tamanho).toBeVisible()
+    await expect(painel.getByRole('button', { name: 'Próxima', exact: true })).toBeVisible()
+    await page.evaluate(() => window.scrollTo(0, 0))
+    await page.screenshot({ path: test.info().outputPath('paginacao-' + recurso + '-mobile.png'), fullPage: true })
+  })
+}
+test('seletor de tamanho mantém foco e fica acessível durante o carregamento', async ({ page }) => {
+  await mockApi(page)
+  let liberar = () => {}
+  const continuar = new Promise<void>(resolve => { liberar = resolve })
+  await page.route('**/api/produtos?**', async route => {
+    const params = new URL(route.request().url()).searchParams
+    if (params.get('tamanho') !== '25') return route.fallback()
+    await continuar
+    return route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ itens: [produto], total: 1, pagina: 0, tamanho: 25 }) })
+  })
+  await page.goto('/')
+  await expect(page.getByText(produto.nome, { exact: true })).toBeVisible()
+  const tamanho = page.getByRole('combobox', { name: 'Itens por página', exact: true })
+  await tamanho.focus()
+  try {
+    await tamanho.selectOption('25')
+    await expect(page.locator('.pagination').getByRole('status')).toHaveText('Carregando…')
+    await expect(tamanho).toBeFocused()
+    await expect(tamanho).toHaveValue('25')
+    await expect(page.getByRole('button', { name: 'Próxima', exact: true })).toBeDisabled()
+  } finally { liberar() }
+  await expect(page.getByText(produto.nome, { exact: true })).toBeVisible()
+  await expect(page.locator('.pagination').getByRole('status')).toHaveText('1–1 de 1 registros')
+})
