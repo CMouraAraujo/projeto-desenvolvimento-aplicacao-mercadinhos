@@ -32,7 +32,7 @@ Admin possui todas as ações. A manutenção de categorias e a gestão de funci
 2. Navegação modular, com menu Produtos conforme CONSULTAR.
 3. Categorias: listagem para autorizados; manutenção somente para ADMIN.
 4. Produtos: listagem paginada com busca, filtro de categoria e situação, e botões conforme ação.
-5. Modal amplo de cadastro/edição com abas Geral, Operacional e Fiscal; seleção de mercadinhos será futura.
+5. Modal de cadastro/edição com seções contínuas Geral, Compra e preço sugerido, Operacional e Fiscal; seleção de mercadinhos será futura.
 
 ## Endpoints de produtos
 
@@ -63,6 +63,9 @@ POST recebe o objeto abaixo. Exemplo ilustrativo; usar uma categoria existente e
   "unidadeMedida": "UN",
   "descricao": "Descrição opcional",
   "marca": "Marca opcional",
+  "valorCompra": 10.00,
+  "percentualMarkup": 50.00,
+  "precoVendaPadrao": 15.00,
   "permiteVendaFracionada": false,
   "controlaLote": false,
   "controlaValidade": true,
@@ -84,10 +87,13 @@ Exemplos fiscais apenas demonstram formato; não determinam o enquadramento trib
 | unidadeMedida | Obrigatória: UN, KG, G, L, ML, CX ou PCT; preferir opções retornadas pela API |
 | descricao | Opcional, até 4000 caracteres |
 | marca | Opcional, até 100 caracteres |
+| valorCompra | Obrigatório em POST/PUT; maior que zero, até 999999999,99 e 2 casas decimais |
+| percentualMarkup | Obrigatório em POST/PUT; acréscimo de 0 a 10000%, até 2 casas decimais; 50 significa +50% |
+| precoVendaPadrao | Opcional (null/omitido limpa no PUT); deve corresponder a compra × (1 + markup/100), HALF_UP a 2 casas, até 999999999,99 |
 | permiteVendaFracionada, controlaLote, controlaValidade | Booleanos opcionais, false se omitidos ou nulos |
 | dadosFiscais | Objeto opcional; não representa configuração fiscal homologada |
 
-Código de barras é único por organização, inclusive entre produtos inativos. Nomes podem repetir. Não há validação de dígito verificador GTIN nesta entrega; o sistema permite códigos internos numéricos. Nenhuma quantidade de estoque, preço ou seleção de unidade faz parte deste objeto.
+Código de barras é único por organização, inclusive entre produtos inativos. Nomes podem repetir. Não há validação de dígito verificador GTIN nesta entrega; o sistema permite códigos internos numéricos. Quantidades de estoque e seleção de unidades ainda são futuras. O produto já guarda custo, markup e um preço de venda padrão opcional; preços específicos por mercadinho serão tratados no módulo de unidades.
 
 Campos fiscais opcionais: ncm (8 dígitos), cest (7), cfopPadrao (4), pisCst e cofinsCst (2), origem (0 a 8), icmsCst (2) ou icmsCsosn (3), icmsModalidadeBaseCalculo (1 ou 2 dígitos), icmsAliquota e icmsReducaoBase (percentuais de 0 a 100, até 4 casas decimais). Não enviar CST e CSOSN simultaneamente. Converter campos fiscais vazios para null ou omiti-los. Não existe valor fixo de base de ICMS no cadastro. A API valida formatos, não existência dos códigos em tabelas oficiais, aplicabilidade tributária ou cálculo de tributos.
 
@@ -104,7 +110,10 @@ PUT substitui todos os dados editáveis e recebe:
     "nome": "Café torrado 500 g",
     "codigoBarras": "00012345",
     "categoriaId": 1,
-    "unidadeMedida": "UN"
+    "unidadeMedida": "UN",
+    "valorCompra": 10.00,
+    "percentualMarkup": 50.00,
+    "precoVendaPadrao": null
   }
 }
 ```
@@ -153,3 +162,9 @@ A V6 adiciona as colunas permitido_para_menores em categorias e produtos com pad
 GET /api/produtos aceita comImagem=true (somente com imagem cadastrada), comImagem=false (somente sem imagem) ou omissão (ambos). O filtro combina com busca, categoriaId e ativo, e é aplicado antes da paginação e do cálculo de total. O contexto continua vindo da organização autenticada; exige PRODUTOS/CONSULTAR.
 
 A presença é determinada pela referência imagem_chave no banco, sem ler o filesystem durante a listagem. Enviar/remover uma imagem altera os resultados na próxima consulta. O frontend deve invalidar a listagem após essas operações e usar imagemUrl como fornecida, sem anexar outro "?v=" quando a URL já contém "?versao=".
+
+## Migration V8 e preços padrão
+
+A V8 adiciona valor_compra DECIMAL(11,2), percentual_markup DECIMAL(7,2) e preco_venda_padrao DECIMAL(11,2). Dados antigos permanecem NULL até uma edição completa. As colunas aceitam esse legado, mas POST/PUT passam a exigir custo e percentual. Não preencher valores fictícios no cliente. Quando enviado, o preço padrão é validado no servidor e calculado com BigDecimal/HALF_UP; o banco também impede valores negativos, pares incompletos e sugestão inconsistente. Limites de dinheiro: 999999999,99; markup: 10000%.
+
+O formulário calcula com inteiros em centavos e oferece a checkbox “Definir preço de venda padrão”. Sem ela, envia null; com ela, envia o valor calculado. A API recebe números JSON (ponto decimal), não textos monetários. A sugestão é preparatória para o módulo de mercadinhos; preço independente por unidade ainda será desenvolvido.

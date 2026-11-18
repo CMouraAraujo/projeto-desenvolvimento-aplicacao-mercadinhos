@@ -395,3 +395,11 @@ Essa informação é preparatória: ainda não há verificação de idade nem bl
 GET /api/produtos aceita comImagem=true/false, combinável com busca, categoria e situação. Omitir esse parâmetro inclui produtos com e sem imagem. O total e a paginação respeitam o filtro e a organização da sessão. A presença é determinada pela referência de imagem no banco.
 
 No painel, o seletor de imagem retorna à primeira página ao mudar. Produtos com imagem mostram sua miniatura; os demais exibem um ícone. Falhas de carregamento são identificadas como imagem indisponível. Reinicie o backend atualizado para habilitar o parâmetro na aplicação em execução; não há migration nova para este ajuste.
+
+## Compra, markup e preço de venda padrão
+
+Produtos agora exigem valorCompra (maior que zero) e percentualMarkup (acréscimo de 0 a 10000%) ao cadastrar/editar, com até duas casas decimais. O modal aceita vírgula ou ponto decimal, indica os campos obrigatórios e calcula o preço como compra × (1 + percentual/100), arredondado a centavos. Ex.: R$ 10,00 + 50% = R$ 15,00. Os valores monetários são limitados a R$ 999999999,99.
+
+precoVendaPadrao é opcional: desmarque “Definir preço de venda padrão” para salvar sem ele. Quando informado, a API confere o cálculo e o banco impõe sua consistência. O preço padrão é uma sugestão para a futura seleção de mercadinhos; ainda não há preço por unidade nem alteração de preços de pontos de venda.
+
+Reinicie o backend atualizado para aplicar a migration V8 e atualize a página. A migration mantém os custos/percentuais/preços de produtos antigos como NULL, sem criar valores fictícios. Ao editar esses produtos, será necessário preencher compra e markup. Não é necessário apagar o banco.

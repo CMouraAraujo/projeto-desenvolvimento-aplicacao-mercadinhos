@@ -60,7 +60,7 @@ Dependências diretas de aplicação sob MIT; TypeScript e Playwright sob Apache
 
 ## Limites
 
-A gestão de funcionários e permissões tem API, mas ainda não tem tela. Recuperação de senha, convites e troca obrigatória de senha inicial dependem de evolução do backend. Não há preços, estoque, mercadinhos, emissão fiscal ou autoatendimento nesta entrega. O preenchimento fiscal não constitui homologação tributária. A obrigatoriedade de NCM, CFOP e situação de ICMS está aplicada no frontend; o contrato atual do backend ainda aceita dados fiscais opcionais. Torná-los obrigatórios também na API exige coordenação com o backend.
+A gestão de funcionários e permissões tem API, mas ainda não tem tela. Recuperação de senha, convites e troca obrigatória de senha inicial dependem de evolução do backend. Há custo, markup e sugestão de preço no catálogo; estoque, mercadinhos, preços por unidade, emissão fiscal e autoatendimento continuam futuros. O preenchimento fiscal não constitui homologação tributária. A obrigatoriedade de NCM, CFOP e situação de ICMS está aplicada no frontend; o contrato atual do backend ainda aceita dados fiscais opcionais. Torná-los obrigatórios também na API exige coordenação com o backend.
 
 A validação autenticada contra o backend real deve ser feita com conta provisionada e categorias da organização. Os testes do frontend verificam comportamento da interface; autorização e isolamento entre organizações continuam sendo responsabilidade e cobertura do backend.
 
@@ -83,3 +83,9 @@ O filtro de imagem oferece "Imagem: todas", "Com imagem" e "Sem imagem". Ele env
 A listagem exibe a miniatura cadastrada usando imagemUrl como retornada pela API, inclusive seu parâmetro de versão, sem concatenar outra interrogação. Se não houver imagem ou o carregamento falhar, aparece um ícone com identificação de ausência/indisponibilidade. A prévia de imagem já cadastrada no modal segue a mesma URL protegida. O filtro considera a referência salva no banco; ele não audita a disponibilidade física dos arquivos.
 
 Atualize e reinicie o backend antes de usar o filtro comImagem na interface.
+
+## Precificação no cadastro
+
+“Valor de compra (R$)” e “Acréscimo / markup (%)” são obrigatórios, com asterisco vermelho. Aceitam vírgula ou ponto e até duas casas decimais; custo positivo até 999999999,99 e percentual de 0 a 10000. O preço de venda padrão é calculado em centavos com arredondamento HALF_UP (10 + 50% = 15), sem exigir preenchimento manual. Desmarcar “Definir preço de venda padrão” envia precoVendaPadrao=null. Recalcular os valores durante edição mantém a proteção por versão.
+
+Reinicie a API atualizada para aplicar V8. Produtos antigos abrem com compra/percentual vazios e exigem preenchimento ao salvar; os valores não são presumidos como zero. O preço padrão fica preparado para uso futuro nos mercadinhos; a configuração por unidade ainda não está implementada.

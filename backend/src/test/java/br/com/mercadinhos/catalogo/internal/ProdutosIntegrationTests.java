@@ -142,7 +142,7 @@ class ProdutosIntegrationTests {
 
     @Test
     void validaObrigatoriosCodigoTextoEFiscal() throws Exception {
-        for (String campo : List.of("nome", "codigoBarras", "categoriaId", "unidadeMedida")) {
+        for (String campo : List.of("nome", "codigoBarras", "categoriaId", "unidadeMedida", "valorCompra", "percentualMarkup")) {
             var dados = dados("123", catA); dados.remove(campo);
             criar(admin, dados).andExpect(status().isBadRequest());
         }
@@ -420,6 +420,59 @@ class ProdutosIntegrationTests {
                 .andExpect(status().isOk()).andExpect(jsonPath("$.total").value(1))
                 .andExpect(jsonPath("$.itens[0].id").value(id));
     }
+    @Test
+    void precificacaoPersisteArredondaEPermiteRemoverSugestao() throws Exception {
+        var dados = dados("00789", catA);
+        dados.put("valorCompra", 0.10); dados.put("percentualMarkup", 5); dados.put("precoVendaPadrao", 0.11);
+        String body = criar(cadastro, dados).andExpect(status().isCreated())
+                .andExpect(jsonPath("$.valorCompra").value(0.10)).andExpect(jsonPath("$.percentualMarkup").value(5))
+                .andExpect(jsonPath("$.precoVendaPadrao").value(0.11)).andReturn().getResponse().getContentAsString();
+        long id = ((Number) JsonPath.read(body, "$.id")).longValue();
+        assertThat(jdbc.queryForObject("SELECT preco_venda_padrao FROM produtos WHERE id = ?", java.math.BigDecimal.class, id))
+                .isEqualByComparingTo("0.11");
+        dados.put("valorCompra", 10); dados.put("percentualMarkup", 150); dados.put("precoVendaPadrao", 25);
+        editar(edicao, id, 0, dados).andExpect(status().isOk()).andExpect(jsonPath("$.precoVendaPadrao").value(25));
+        mvc.perform(get("/api/produtos/" + id).with(user(consulta))).andExpect(status().isOk())
+                .andExpect(jsonPath("$.valorCompra").value(10)).andExpect(jsonPath("$.percentualMarkup").value(150));
+        dados.remove("precoVendaPadrao");
+        editar(edicao, id, 1, dados).andExpect(status().isOk()).andExpect(jsonPath("$.precoVendaPadrao").isEmpty());
+        assertThat(jdbc.queryForObject("SELECT preco_venda_padrao FROM produtos WHERE id = ?", java.math.BigDecimal.class, id)).isNull();
+    }
+
+    @Test
+    void rejeitaPrecificacaoInvalidaOuPrecoManipuladoSemAlterarProduto() throws Exception {
+        for (String campo : List.of("valorCompra", "percentualMarkup")) {
+            for (Object valor : List.of(-1, 1.001, "abc", 1000000000)) {
+                var dados = dados("00789", catA); dados.put(campo, valor);
+                criar(admin, dados).andExpect(status().isBadRequest());
+            }
+            var dados = dados("00789", catA); dados.put(campo, null);
+            criar(admin, dados).andExpect(status().isBadRequest());
+        }
+        var dados = dados("00789", catA); dados.put("valorCompra", 0);
+        criar(admin, dados).andExpect(status().isBadRequest());
+        dados.put("valorCompra", 10); dados.put("percentualMarkup", 10000.01);
+        criar(admin, dados).andExpect(status().isBadRequest());
+        dados.put("percentualMarkup", 50); dados.put("precoVendaPadrao", 20);
+        criar(admin, dados).andExpect(status().isBadRequest());
+        dados.put("precoVendaPadrao", 15);
+        long id = criarId(admin, "00790", catA);
+        editar(edicao, id, 0, dados).andExpect(status().isOk());
+        dados.put("precoVendaPadrao", 17);
+        editar(edicao, id, 1, dados).andExpect(status().isBadRequest());
+        mvc.perform(get("/api/produtos/" + id).with(user(consulta))).andExpect(status().isOk())
+                .andExpect(jsonPath("$.precoVendaPadrao").value(15)).andExpect(jsonPath("$.versao").value(1));
+    }
+
+    @Test
+    void aceitaMarkupZeroEAcimaDeCemSemObrigarPrecoPadrao() throws Exception {
+        for (int percentual : List.of(0, 150, 10000)) {
+            var dados = dados("00" + percentual, catA); dados.put("percentualMarkup", percentual);
+            criar(cadastro, dados).andExpect(status().isCreated()).andExpect(jsonPath("$.percentualMarkup").value(percentual))
+                    .andExpect(jsonPath("$.precoVendaPadrao").isEmpty());
+        }
+    }
+
     private List<Integer> concorrer(Callable<Integer> chamada) throws Exception {
         var inicio = new CountDownLatch(1);
         Callable<Integer> tarefa = () -> { inicio.await(); return chamada.call(); };
@@ -437,7 +490,7 @@ class ProdutosIntegrationTests {
     }
 
     private Map<String, Object> dados(String codigo, Long categoria) {
-        return new HashMap<>(Map.of("nome", "Produto teste", "codigoBarras", codigo, "categoriaId", categoria, "unidadeMedida", "UN"));
+        return new HashMap<>(Map.of("nome", "Produto teste", "codigoBarras", codigo, "categoriaId", categoria, "unidadeMedida", "UN", "valorCompra", 10, "percentualMarkup", 50));
     }
 
     private ResultActions criar(UserDetails ator, Map<String, Object> dados) throws Exception { return enviar(ator, post("/api/produtos"), dados); }

@@ -3,7 +3,7 @@ import { dadosProduto, produtoSchema, valoresProduto } from './produtoSchema'
 import { pode, type Produto, type Usuario } from '../shared/types'
 
 const valid = () => {
-  const form = { ...valoresProduto(), nome: 'Café', codigoBarras: '00012345', categoriaId: '3' }
+  const form = { ...valoresProduto(), nome: 'Café', codigoBarras: '00012345', categoriaId: '3', valorCompra: '10,00', percentualMarkup: '50' }
   Object.assign(form.dadosFiscais, { ncm: '09012100', cfopPadrao: '5102', icmsCsosn: '102' })
   return form
 }
@@ -79,5 +79,39 @@ describe('campos obrigatórios do formulário de produto', () => {
     form.dadosFiscais.icmsCst = ''
     form.dadosFiscais.icmsCsosn = '102'
     expect(produtoSchema.safeParse(form).success).toBe(true)
+  })
+})
+
+
+describe('precificação do produto', () => {
+  it.each([
+    ['10,00', '50', 15], ['10.00', '150', 25], ['0,10', '5', 0.11],
+    ['19,90', '33,33', 26.53], ['10', '0', 10], ['1', '10000', 101],
+  ])('calcula custo %s e acréscimo %s com arredondamento a centavos', (valorCompra, percentualMarkup, preco) => {
+    const dados = dadosProduto(produtoSchema.parse({ ...valid(), valorCompra, percentualMarkup }))
+    expect(dados.precoVendaPadrao).toBe(preco)
+    expect(dados).not.toHaveProperty('definirPrecoVendaPadrao')
+  })
+  it.each(['', '-1', '0', '1,001', '1000000000', 'abc'])('rejeita valor de compra %s', valorCompra => {
+    expect(produtoSchema.safeParse({ ...valid(), valorCompra }).success).toBe(false)
+  })
+  it.each(['', '-1', '10000,01', '1.001', 'abc'])('rejeita markup %s', percentualMarkup => {
+    expect(produtoSchema.safeParse({ ...valid(), percentualMarkup }).success).toBe(false)
+  })
+  it('permite omitir a sugestão e preserva a opção ao editar', () => {
+    const dados = dadosProduto(produtoSchema.parse({ ...valid(), definirPrecoVendaPadrao: false }))
+    expect(dados).toMatchObject({ valorCompra: 10, percentualMarkup: 50, precoVendaPadrao: null })
+    expect(valoresProduto({ ...dados } as Produto).definirPrecoVendaPadrao).toBe(false)
+  })
+  it('não inventa custo e markup para produto antigo', () => {
+    const form = valoresProduto({ ...dadosProduto(valid()), valorCompra: null, percentualMarkup: null, precoVendaPadrao: null } as Produto)
+    expect(form.valorCompra).toBe('')
+    expect(form.percentualMarkup).toBe('')
+    expect(produtoSchema.safeParse(form).success).toBe(false)
+  })
+  it('impede sugestão acima do limite sem impedir cadastro sem sugestão', () => {
+    const form = { ...valid(), valorCompra: '999999999,99', percentualMarkup: '100' }
+    expect(produtoSchema.safeParse(form).success).toBe(false)
+    expect(produtoSchema.safeParse({ ...form, definirPrecoVendaPadrao: false }).success).toBe(true)
   })
 })

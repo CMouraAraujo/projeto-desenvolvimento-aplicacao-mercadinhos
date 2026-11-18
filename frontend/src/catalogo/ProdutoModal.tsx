@@ -9,6 +9,7 @@ import { ErrorNotice, Field, Icon, Loading, Modal } from '../shared/ui'
 import { catalogo } from './api'
 import { CategoriaModal } from './CategoriaModal'
 import { CodigoFiscalInput } from './CodigoFiscalInput'
+import { precoSugerido } from './precificacao'
 import { camposSituacaoIcms, situacoesIcms } from './situacoesIcms'
 import { dadosProduto, fiscalFields, produtoSchema, validarImagem, valoresProduto, type ProdutoForm } from './produtoSchema'
 
@@ -56,6 +57,8 @@ function ProdutoEditor({ initial, categorias, opcoes, onClose, onSaved }: Props 
     return () => URL.revokeObjectURL(url)
   }, [arquivo])
   const icmsCst = watch('dadosFiscais.icmsCst')
+  const definirPreco = watch('definirPrecoVendaPadrao')
+  const sugestao = precoSugerido(watch('valorCompra'), watch('percentualMarkup'))
   const busy = isSubmitting || busyImage
   const invalidate = () => {
     void client.invalidateQueries({ queryKey: ['produtos'] })
@@ -141,8 +144,17 @@ function ProdutoEditor({ initial, categorias, opcoes, onClose, onSaved }: Props 
               {!readOnly && !can('EDITAR') && <p className="muted">O envio de imagem exige a permissão Editar produtos.</p>}
             </div>
           </section>
+          <section className="product-section" aria-labelledby="produto-preco">
+            <div className="section-heading"><span className="eyebrow">02 · PRECIFICAÇÃO</span><h3 id="produto-preco">Compra e preço sugerido</h3><p>O acréscimo incide sobre o valor de compra. Ex.: R$ 10,00 + 50% = R$ 15,00.</p></div>
+            <div className="form-grid">
+              <Field label="Valor de compra (R$)" required error={errors.valorCompra?.message}><input inputMode="decimal" placeholder="0,00" maxLength={12} {...register('valorCompra')} aria-invalid={!!errors.valorCompra}/></Field>
+              <Field label="Acréscimo / markup (%)" required error={errors.percentualMarkup?.message}><input inputMode="decimal" placeholder="Ex.: 50" maxLength={8} {...register('percentualMarkup')} aria-invalid={!!errors.percentualMarkup}/></Field>
+            </div>
+            <div className="check-list"><label><input type="checkbox" {...register('definirPrecoVendaPadrao')}/><span><strong>Definir preço de venda padrão</strong><small>Opcional. Guarde a sugestão para usar como preço inicial nas futuras unidades de venda.</small></span></label></div>
+            <Field label="Preço de venda padrão (R$)" hint="Calculado automaticamente: compra × (1 + markup ÷ 100)."><input readOnly value={definirPreco ? sugestao ?? '' : ''} placeholder={definirPreco ? 'Preencha a compra e o percentual' : 'Sem preço padrão'} /></Field>
+          </section>
           <section className="product-section" aria-labelledby="produto-operacional">
-            <div className="section-heading"><span className="eyebrow">02 · CONFIGURAÇÃO</span><h3 id="produto-operacional">Operacional</h3><p>Estas opções preparam o cadastro para os próximos módulos.</p></div>
+            <div className="section-heading"><span className="eyebrow">03 · CONFIGURAÇÃO</span><h3 id="produto-operacional">Operacional</h3><p>Estas opções preparam o cadastro para os próximos módulos.</p></div>
             <Field label="Unidade de medida" required error={errors.unidadeMedida?.message}><select {...register('unidadeMedida')}>{opcoes.unidadesMedida.map(u => <option key={u} value={u}>{u}</option>)}</select></Field>
             <div className="check-list">
               <label><input type="checkbox" {...register('permiteVendaFracionada')}/><span><strong>Permite venda fracionada</strong><small>Indica se o produto pode ser vendido em frações.</small></span></label>
@@ -151,7 +163,7 @@ function ProdutoEditor({ initial, categorias, opcoes, onClose, onSaved }: Props 
             </div>
           </section>
           <section className="product-section" aria-labelledby="produto-fiscal">
-            <div className="section-heading"><span className="eyebrow">03 · CLASSIFICAÇÃO</span><h3 id="produto-fiscal">Fiscal</h3><p>NCM, CFOP e situação tributária de ICMS são obrigatórios. Valide o enquadramento com sua contabilidade.</p></div>
+            <div className="section-heading"><span className="eyebrow">04 · CLASSIFICAÇÃO</span><h3 id="produto-fiscal">Fiscal</h3><p>NCM, CFOP e situação tributária de ICMS são obrigatórios. Valide o enquadramento com sua contabilidade.</p></div>
             <div className="notice">Estes dados não realizam cálculos tributários nem emissão de documentos fiscais.</div>
             <div className="form-grid">{fiscalFields.map(([key, label, length]) =>
               key === 'icmsCsosn' ? null

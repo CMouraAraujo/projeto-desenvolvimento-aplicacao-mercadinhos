@@ -1,6 +1,7 @@
 package br.com.mercadinhos.catalogo.internal;
 
 import java.time.Instant;
+import java.math.BigDecimal;
 import jakarta.persistence.*;
 import lombok.AccessLevel;
 import lombok.Getter;
@@ -18,6 +19,9 @@ class Produto {
     @Column(name = "codigo_barras", nullable = false, length = 64) private String codigoBarras;
     @Column(length = 4000) private String descricao;
     @Column(length = 100) private String marca;
+    @Column(name = "valor_compra", precision = 11, scale = 2) private BigDecimal valorCompra;
+    @Column(name = "percentual_markup", precision = 7, scale = 2) private BigDecimal percentualMarkup;
+    @Column(name = "preco_venda_padrao", precision = 11, scale = 2) private BigDecimal precoVendaPadrao;
     @Enumerated(EnumType.STRING) @Column(name = "unidade_medida", nullable = false, length = 10) private UnidadeMedida unidadeMedida;
     @Column(name = "permite_venda_fracionada", nullable = false) private boolean permiteVendaFracionada;
     @Column(name = "controla_lote", nullable = false) private boolean controlaLote;
@@ -47,6 +51,9 @@ class Produto {
         unidadeMedida = dados.unidadeMedida();
         descricao = limpar(dados.descricao());
         marca = limpar(dados.marca());
+        valorCompra = dados.valorCompra();
+        percentualMarkup = dados.percentualMarkup();
+        precoVendaPadrao = dados.precoVendaPadrao() == null ? null : PrecificacaoProduto.calcular(valorCompra, percentualMarkup);
         permiteVendaFracionada = Boolean.TRUE.equals(dados.permiteVendaFracionada());
         controlaLote = Boolean.TRUE.equals(dados.controlaLote());
         controlaValidade = Boolean.TRUE.equals(dados.controlaValidade());

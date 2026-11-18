@@ -48,6 +48,7 @@ class ProdutosService {
         acesso.exigir(Modulo.PRODUTOS, Acao.CADASTRAR);
         Long org = acesso.organizacaoId();
         validarNome(dados.nome());
+        PrecificacaoProduto.validar(dados);
         var categoria = exigirCategoriaAtiva(dados.categoriaId(), org);
         return mapper.resposta(produtos.saveAndFlush(new Produto(org, dados, acesso.usuarioId(), categoria.isPermitidoParaMenores())));
     }
@@ -58,6 +59,7 @@ class ProdutosService {
         var produto = paraAlterar(id, alteracao.versao());
         var dados = alteracao.dados();
         validarNome(dados.nome());
+        PrecificacaoProduto.validar(dados);
         boolean permitidoParaMenores = produto.isPermitidoParaMenores();
         if (!produto.getCategoriaId().equals(dados.categoriaId())) {
             permitidoParaMenores = exigirCategoriaAtiva(dados.categoriaId(), produto.getOrganizacaoId()).isPermitidoParaMenores();

@@ -13,10 +13,12 @@ export type DadosFiscais = {
 }
 export type DadosProduto = {
   nome: string; codigoBarras: string; categoriaId: number; unidadeMedida: Unidade
+  valorCompra: number; percentualMarkup: number; precoVendaPadrao: number | null
   descricao: string | null; marca: string | null; permiteVendaFracionada: boolean
   controlaLote: boolean; controlaValidade: boolean; dadosFiscais: DadosFiscais | null
 }
-export type Produto = DadosProduto & {
+export type Produto = Omit<DadosProduto, 'valorCompra' | 'percentualMarkup'> & {
+  valorCompra: number | null; percentualMarkup: number | null
   id: number; ativo: boolean; permitidoParaMenores: boolean; versao: number; imagemUrl: string | null
   criadoEm: string; atualizadoEm: string; criadoPor: number; atualizadoPor: number
 }

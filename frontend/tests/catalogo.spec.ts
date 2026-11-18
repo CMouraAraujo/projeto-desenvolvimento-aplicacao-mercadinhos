@@ -2,7 +2,7 @@ import { test, expect, type Page } from '@playwright/test'
 
 const categoria = { id: 1, nome: 'Mercearia', ativa: true, permitidoParaMenores: false, versao: 0, criadoEm: '2026-11-16T12:00:00Z', atualizadoEm: '2026-11-16T12:00:00Z' }
 const fiscalObrigatorio = { ncm: '09012100', cfopPadrao: '5102', icmsCst: null, icmsCsosn: '102' }
-const produto = { id: 1, nome: 'Café torrado 500 g', codigoBarras: '00012345', categoriaId: 1, unidadeMedida: 'UN', descricao: null, marca: 'Café da Serra', permiteVendaFracionada: false, controlaLote: false, controlaValidade: true, dadosFiscais: fiscalObrigatorio, ativo: true, permitidoParaMenores: false, versao: 3, imagemUrl: null, criadoEm: '2026-11-16T12:00:00Z', atualizadoEm: '2026-11-16T12:00:00Z', criadoPor: 1, atualizadoPor: 1 }
+const produto = { valorCompra: 10, percentualMarkup: 50, precoVendaPadrao: 15, id: 1, nome: 'Café torrado 500 g', codigoBarras: '00012345', categoriaId: 1, unidadeMedida: 'UN', descricao: null, marca: 'Café da Serra', permiteVendaFracionada: false, controlaLote: false, controlaValidade: true, dadosFiscais: fiscalObrigatorio, ativo: true, permitidoParaMenores: false, versao: 3, imagemUrl: null, criadoEm: '2026-11-16T12:00:00Z', atualizadoEm: '2026-11-16T12:00:00Z', criadoPor: 1, atualizadoPor: 1 }
 type Options = { admin?: boolean; authenticated?: boolean; permissions?: string[] }
 async function mockApi(page: Page, options: Options = {}) {
   let authenticated = options.authenticated !== false
@@ -33,7 +33,12 @@ async function mockApi(page: Page, options: Options = {}) {
   })
   return calls
 }
+async function preencherPrecificacao(page: Page) {
+  await page.getByRole('textbox', { name: 'Valor de compra (R$)', exact: true }).fill('10,00')
+  await page.getByRole('textbox', { name: 'Acréscimo / markup (%)', exact: true }).fill('50')
+}
 async function preencherFiscalObrigatorio(page: Page) {
+  await preencherPrecificacao(page)
   await page.getByRole('textbox', { name: 'NCM', exact: true }).fill('09012100')
   await page.getByRole('textbox', { name: 'CFOP padrão', exact: true }).fill('5102')
   await page.getByRole('combobox', { name: 'Situação tributária de ICMS', exact: true }).selectOption('102')
@@ -284,6 +289,7 @@ test('NCM e CEST são formatados ao digitar e enviados somente com dígitos', as
   await expect(cest).toHaveValue('01.001.00')
   await page.getByRole('textbox', { name: 'CFOP padrão', exact: true }).fill('5102')
   await page.getByRole('combobox', { name: 'Situação tributária de ICMS', exact: true }).selectOption('102')
+  await preencherPrecificacao(page)
   // Apagar ao lado de um separador não pode prender o cursor.
   await ncm.evaluate((input: HTMLInputElement) => { input.focus(); input.setSelectionRange(5, 5) })
   await ncm.press('Backspace')
@@ -386,6 +392,7 @@ test('prévia maior aparece ao selecionar imagem e sai ao cancelar, sem salvar p
 for (const [label, role] of [
   ['Nome do produto', 'textbox'], ['Categoria', 'combobox'], ['CFOP padrão', 'textbox'],
   ['NCM', 'textbox'], ['Situação tributária de ICMS', 'combobox'],
+  ['Valor de compra (R$)', 'textbox'], ['Acréscimo / markup (%)', 'textbox'],
 ] as const) {
   test('não salva produto com obrigatório vazio: ' + label, async ({ page }) => {
     const calls = await mockApi(page)
@@ -695,4 +702,58 @@ test('falha na miniatura mantém o produto visível e uma nova versão permite r
   const miniatura = page.getByRole('img', { name: 'Imagem de ' + produto.nome, exact: true })
   await expect(miniatura).toHaveJSProperty('naturalWidth', 20)
   await expect(miniatura).toHaveAttribute('src', '/api/produtos/1/imagem?versao=4')
+})
+
+
+test('precificação atualiza sugestão, aceita vírgula e permite salvar sem preço padrão', async ({ page }) => {
+  const calls = await mockApi(page)
+  await page.goto('/')
+  await page.getByRole('button', { name: 'Novo produto', exact: true }).click()
+  await page.getByRole('textbox', { name: 'Nome do produto', exact: true }).fill('Produto com custo')
+  await page.getByRole('textbox', { name: 'Código de barras', exact: true }).fill('000789')
+  await page.getByRole('combobox', { name: 'Categoria', exact: true }).selectOption('1')
+  await preencherFiscalObrigatorio(page)
+  const preco = page.getByRole('textbox', { name: 'Preço de venda padrão (R$)', exact: true })
+  await expect(preco).toHaveValue('15,00')
+  await expect(preco).toHaveAttribute('readonly', '')
+  await page.getByRole('textbox', { name: 'Acréscimo / markup (%)', exact: true }).fill('150')
+  await expect(preco).toHaveValue('25,00')
+  await page.getByRole('textbox', { name: 'Valor de compra (R$)', exact: true }).fill('0,10')
+  await page.getByRole('textbox', { name: 'Acréscimo / markup (%)', exact: true }).fill('5')
+  await expect(preco).toHaveValue('0,11')
+  await preco.scrollIntoViewIfNeeded()
+  await page.screenshot({ path: test.info().outputPath('produto-precificacao.png') })
+  await page.getByRole('checkbox', { name: 'Definir preço de venda padrão' }).uncheck()
+  await expect(preco).toHaveValue('')
+  await page.getByRole('button', { name: 'Salvar produto', exact: true }).click()
+  await expect(page.getByRole('dialog')).toHaveCount(0)
+  expect(calls.find(c => c.method === 'POST' && c.path === '/api/produtos')?.body).toMatchObject({ valorCompra: 0.1, percentualMarkup: 5, precoVendaPadrao: null })
+})
+
+test('edição recalcula e envia sugestão com a versão do produto', async ({ page }) => {
+  const calls = await mockApi(page)
+  await page.goto('/')
+  await page.getByRole('button', { name: 'Editar ' + produto.nome, exact: true }).click()
+  await expect(page.getByRole('textbox', { name: 'Valor de compra (R$)', exact: true })).toHaveValue('10,00')
+  await page.getByRole('textbox', { name: 'Acréscimo / markup (%)', exact: true }).fill('33,33')
+  await expect(page.getByRole('textbox', { name: 'Preço de venda padrão (R$)', exact: true })).toHaveValue('13,33')
+  await page.getByRole('button', { name: 'Salvar produto', exact: true }).click()
+  await expect(page.getByRole('dialog')).toHaveCount(0)
+  expect(calls.find(c => c.method === 'PUT')?.body).toMatchObject({ versao: 3, dados: { valorCompra: 10, percentualMarkup: 33.33, precoVendaPadrao: 13.33 } })
+})
+
+test('produto antigo exige preencher compra e markup sem inventar preços', async ({ page }) => {
+  const calls = await mockApi(page)
+  await page.route('**/api/produtos/1', route => route.request().method() === 'GET'
+    ? route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ ...produto, valorCompra: null, percentualMarkup: null, precoVendaPadrao: null }) })
+    : route.fallback())
+  await page.goto('/')
+  await page.getByRole('button', { name: 'Editar ' + produto.nome, exact: true }).click()
+  await page.getByRole('button', { name: 'Salvar produto', exact: true }).click()
+  await expect(page.getByRole('alert')).toHaveCount(2)
+  expect(calls.some(c => c.method === 'PUT')).toBe(false)
+  await preencherPrecificacao(page)
+  await page.getByRole('button', { name: 'Salvar produto', exact: true }).click()
+  await expect(page.getByRole('dialog')).toHaveCount(0)
+  expect(calls.find(c => c.method === 'PUT')?.body).toMatchObject({ dados: { valorCompra: 10, percentualMarkup: 50, precoVendaPadrao: null } })
 })
