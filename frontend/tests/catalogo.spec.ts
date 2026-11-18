@@ -538,30 +538,30 @@ for (const recurso of ['produtos', 'categorias'] as const) {
     await expect(tamanho).toHaveValue('10')
     expect(await tamanho.locator('option').allTextContents()).toEqual(['10', '25', '50'])
     await expect(painel.locator('tbody tr')).toHaveCount(10)
-    await expect(painel.getByRole('status')).toHaveText('1–10 de 61 registros')
+    await expect(painel.locator('.pagination').getByRole('status')).toHaveText('1–10 de 61 registros')
     await expect(painel.getByRole('button', { name: 'Anterior', exact: true })).toBeDisabled()
     await page.getByRole('textbox', { name: recurso === 'produtos' ? 'Buscar produtos' : 'Buscar categorias', exact: true }).fill('Item')
     await page.getByRole('button', { name: 'Buscar', exact: true }).click()
     await page.getByRole('combobox', { name: 'Filtrar situação', exact: true }).selectOption('true')
     await expect(painel.locator('tbody tr')).toHaveCount(10)
     await painel.getByRole('button', { name: 'Próxima', exact: true }).click()
-    await expect(painel.getByRole('status')).toHaveText('11–20 de 61 registros')
+    await expect(painel.locator('.pagination').getByRole('status')).toHaveText('11–20 de 61 registros')
     await tamanho.selectOption('25')
     await expect(painel.locator('tbody tr')).toHaveCount(25)
-    await expect(painel.getByRole('status')).toHaveText('1–25 de 61 registros')
+    await expect(painel.locator('.pagination').getByRole('status')).toHaveText('1–25 de 61 registros')
     expect(pedidos.at(-1)).toMatchObject({ pagina: 0, tamanho: 25, busca: 'Item', situacao: 'true' })
     await painel.getByRole('button', { name: 'Próxima', exact: true }).click()
-    await expect(painel.getByRole('status')).toHaveText('26–50 de 61 registros')
+    await expect(painel.locator('.pagination').getByRole('status')).toHaveText('26–50 de 61 registros')
     await tamanho.selectOption('50')
     await expect(painel.locator('tbody tr')).toHaveCount(50)
-    await expect(painel.getByRole('status')).toHaveText('1–50 de 61 registros')
+    await expect(painel.locator('.pagination').getByRole('status')).toHaveText('1–50 de 61 registros')
     expect(pedidos.at(-1)).toMatchObject({ pagina: 0, tamanho: 50, busca: 'Item', situacao: 'true' })
     await painel.getByRole('button', { name: 'Próxima', exact: true }).click()
     await expect(painel.locator('tbody tr')).toHaveCount(11)
-    await expect(painel.getByRole('status')).toHaveText('51–61 de 61 registros')
+    await expect(painel.locator('.pagination').getByRole('status')).toHaveText('51–61 de 61 registros')
     await expect(painel.getByRole('button', { name: 'Próxima', exact: true })).toBeDisabled()
     await painel.getByRole('button', { name: 'Anterior', exact: true }).click()
-    await expect(painel.getByRole('status')).toHaveText('1–50 de 61 registros')
+    await expect(painel.locator('.pagination').getByRole('status')).toHaveText('1–50 de 61 registros')
     await tamanho.selectOption('10')
     await expect(painel.locator('tbody tr')).toHaveCount(10)
     await page.evaluate(() => window.scrollTo(0, 0))
@@ -598,4 +598,101 @@ test('seletor de tamanho mantém foco e fica acessível durante o carregamento',
   } finally { liberar() }
   await expect(page.getByText(produto.nome, { exact: true })).toBeVisible()
   await expect(page.locator('.pagination').getByRole('status')).toHaveText('1–1 de 1 registros')
+})
+
+async function pngDeTeste(page: Page) {
+  const imagem = await page.evaluate(() => {
+    const canvas = document.createElement('canvas')
+    canvas.width = 20; canvas.height = 20
+    const ctx = canvas.getContext('2d')!
+    ctx.fillStyle = '#ff6400'; ctx.fillRect(0, 0, 20, 20)
+    return canvas.toDataURL('image/png').split(',')[1]
+  })
+  return Buffer.from(imagem, 'base64')
+}
+test('filtra produtos com e sem imagem no servidor, mantém filtros e reseta paginação', async ({ page }) => {
+  await mockApi(page)
+  const png = await pngDeTeste(page)
+  const pedidos: URLSearchParams[] = []
+  const registros = Array.from({ length: 24 }, (_, index) => ({
+    ...produto, id: index + 1, nome: 'Produto ' + String(index + 1).padStart(2, '0'),
+    imagemUrl: index % 2 === 0 ? '/api/produtos/' + (index + 1) + '/imagem?versao=3' : null,
+  }))
+  await page.route('**/api/produtos/*/imagem?**', route => route.fulfill({ status: 200, contentType: 'image/png', body: png }))
+  await page.route('**/api/produtos?**', route => {
+    const params = new URL(route.request().url()).searchParams
+    pedidos.push(params)
+    const pagina = Number(params.get('pagina') ?? 0)
+    const tamanho = Number(params.get('tamanho') ?? 10)
+    const filtrados = registros.filter(p => !params.has('comImagem') || (!!p.imagemUrl === (params.get('comImagem') === 'true')))
+    return route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({
+      itens: filtrados.slice(pagina * tamanho, (pagina + 1) * tamanho), total: filtrados.length, pagina, tamanho,
+    }) })
+  })
+  await page.goto('/')
+  await page.getByRole('textbox', { name: 'Buscar produtos', exact: true }).fill('Produto')
+  await page.getByRole('button', { name: 'Buscar', exact: true }).click()
+  await page.getByRole('combobox', { name: 'Filtrar categoria', exact: true }).selectOption('1')
+  await page.getByRole('combobox', { name: 'Filtrar situação', exact: true }).selectOption('true')
+  const painel = page.locator('section.panel')
+  await expect(painel.locator('.pagination').getByRole('status')).toHaveText('1–10 de 24 registros')
+  await painel.getByRole('button', { name: 'Próxima', exact: true }).click()
+  await expect(painel.locator('.pagination').getByRole('status')).toHaveText('11–20 de 24 registros')
+  const filtro = page.getByRole('combobox', { name: 'Filtrar imagem', exact: true })
+  await filtro.selectOption('true')
+  await expect(painel.locator('.pagination').getByRole('status')).toHaveText('1–10 de 12 registros')
+  expect(Object.fromEntries(pedidos.at(-1)!)).toMatchObject({ comImagem: 'true', pagina: '0', busca: 'Produto', categoriaId: '1', ativo: 'true' })
+  await painel.getByRole('combobox', { name: 'Itens por página', exact: true }).selectOption('25')
+  await expect(painel.locator('tbody tr')).toHaveCount(12)
+  await expect(painel.locator('tbody img')).toHaveCount(12)
+  await filtro.selectOption('false')
+  await expect(painel.locator('.pagination').getByRole('status')).toHaveText('1–12 de 12 registros')
+  await expect(painel.locator('tbody img')).toHaveCount(0)
+  expect(Object.fromEntries(pedidos.at(-1)!)).toMatchObject({ comImagem: 'false', tamanho: '25', busca: 'Produto', categoriaId: '1', ativo: 'true' })
+  await page.getByRole('button', { name: 'Limpar filtros', exact: true }).click()
+  await expect(painel.locator('.pagination').getByRole('status')).toHaveText('1–24 de 24 registros')
+  await expect(filtro).toHaveValue('')
+  expect(pedidos.at(-1)!.has('comImagem')).toBe(false)
+  expect(pedidos.at(-1)!.has('busca')).toBe(false)
+})
+test('miniatura e modal exibem a imagem cadastrada sem duplicar parâmetros de versão', async ({ page }) => {
+  await mockApi(page)
+  const png = await pngDeTeste(page)
+  const comImagem = { ...produto, imagemUrl: '/api/produtos/1/imagem?versao=3' }
+  await page.route('**/api/produtos?**', route => route.fulfill({
+    status: 200, contentType: 'application/json', body: JSON.stringify({ itens: [comImagem], total: 1, pagina: 0, tamanho: 10 }),
+  }))
+  await page.route('**/api/produtos/1', route => route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(comImagem) }))
+  await page.route('**/api/produtos/1/imagem?**', route => route.fulfill({ status: 200, contentType: 'image/png', body: png }))
+  await page.goto('/')
+  const miniatura = page.getByRole('img', { name: 'Imagem de ' + produto.nome, exact: true })
+  await expect(miniatura).toHaveJSProperty('naturalWidth', 20)
+  await expect(miniatura).toHaveAttribute('src', comImagem.imagemUrl)
+  await page.screenshot({ path: test.info().outputPath('catalogo-miniatura.png'), fullPage: true })
+  await page.getByRole('button', { name: 'Editar ' + produto.nome, exact: true }).click()
+  const imagem = page.getByRole('dialog').getByRole('img', { name: produto.nome, exact: true })
+  await expect(imagem).toHaveJSProperty('naturalWidth', 20)
+  await expect(imagem).toHaveAttribute('src', comImagem.imagemUrl)
+})
+test('falha na miniatura mantém o produto visível e uma nova versão permite recarregar a imagem', async ({ page }) => {
+  await mockApi(page)
+  const png = await pngDeTeste(page)
+  let versao = 3
+  await page.route('**/api/produtos?**', route => route.fulfill({
+    status: 200, contentType: 'application/json', body: JSON.stringify({
+      itens: [{ ...produto, versao, imagemUrl: '/api/produtos/1/imagem?versao=' + versao }], total: 1, pagina: 0, tamanho: 10,
+    }),
+  }))
+  await page.route('**/api/produtos/1/imagem?**', route => new URL(route.request().url()).searchParams.get('versao') === '3'
+    ? route.fulfill({ status: 404 })
+    : route.fulfill({ status: 200, contentType: 'image/png', body: png }))
+  await page.goto('/')
+  await expect(page.getByRole('img', { name: 'Imagem indisponível', exact: true })).toBeVisible()
+  await expect(page.getByText(produto.nome, { exact: true })).toBeVisible()
+  versao = 4
+  await page.getByRole('textbox', { name: 'Buscar produtos', exact: true }).fill('Café')
+  await page.getByRole('button', { name: 'Buscar', exact: true }).click()
+  const miniatura = page.getByRole('img', { name: 'Imagem de ' + produto.nome, exact: true })
+  await expect(miniatura).toHaveJSProperty('naturalWidth', 20)
+  await expect(miniatura).toHaveAttribute('src', '/api/produtos/1/imagem?versao=4')
 })

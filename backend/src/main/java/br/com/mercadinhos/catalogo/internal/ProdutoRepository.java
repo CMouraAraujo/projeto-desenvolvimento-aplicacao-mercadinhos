@@ -13,9 +13,11 @@ interface ProdutoRepository extends JpaRepository<Produto, Long> {
 
     @Query("select p from Produto p where p.organizacaoId = :org "
             + "and (:ativo is null or p.ativo = :ativo) and (:categoria is null or p.categoriaId = :categoria) "
+            + "and (:comImagem is null or (:comImagem = true and p.imagemChave is not null) "
+            + "or (:comImagem = false and p.imagemChave is null)) "
             + "and (:busca is null or p.nome like :busca escape '!' or p.codigoBarras like :busca escape '!')")
     Page<Produto> listar(@Param("org") Long org, @Param("ativo") Boolean ativo,
-            @Param("categoria") Long categoria, @Param("busca") String busca, Pageable pageable);
+            @Param("categoria") Long categoria, @Param("busca") String busca, @Param("comImagem") Boolean comImagem, Pageable pageable);
 
     @Lock(LockModeType.PESSIMISTIC_WRITE)
     @Query("select p from Produto p where p.id = :id and p.organizacaoId = :org")

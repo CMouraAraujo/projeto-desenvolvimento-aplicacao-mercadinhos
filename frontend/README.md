@@ -20,7 +20,7 @@ Abra http://127.0.0.1:5173. O Vite encaminha /api para o backend. Use uma conta 
 - Login por formulário, sessão HttpOnly, renovação de CSRF após login e logout.
 - Tratamento de 401 com remoção do cache privado e retorno ao login.
 - Navegação e ações conforme as permissões efetivas.
-- Produtos: paginação no servidor, busca por nome/código, filtros por categoria/situação, consulta, cadastro, edição e ativação/inativação.
+- Produtos: paginação no servidor, busca por nome/código, filtros por categoria/situação/presença de imagem, consulta, cadastro, edição e ativação/inativação.
 - Painéis de Produtos e Categorias com listagem compacta e seleção de 10, 25 ou 50 itens por página (padrão 10). Trocar a quantidade retorna à primeira página e mantém os filtros; Anterior/Próxima consultam a API. Se o total diminuir, a página é ajustada para continuar no intervalo disponível.
 - No formulário de produto, nome, categoria, código de barras, unidade de medida, NCM, CFOP e situação tributária de ICMS são obrigatórios, indicados por asterisco vermelho e atributos de acessibilidade. A edição de produtos antigos sem esses dados exige completá-los antes de salvar.
 - Modal de produtos em página única com seções Geral, Operacional e Fiscal, rolagem, espaçamento compacto, validação e confirmação de descarte.
@@ -77,3 +77,9 @@ A migration V6 do backend cria permitido_para_menores BOOLEAN NOT NULL DEFAULT F
 A paleta institucional é definida por variáveis CSS em src/styles.css: laranja #FF6400, grafite #232323 e branco #FFFFFF. Os tons de apoio usam cinzas neutros e variações de laranja para bordas, fundos, hover e foco. Navegação e painel de apresentação do login usam grafite; o conteúdo usa superfícies claras.
 
 Botões primários combinam fundo laranja com texto grafite para legibilidade. Descrições e textos pequenos usam cinzas de maior contraste. Erros e asteriscos obrigatórios mantêm vermelho semântico. O layout compacto dos formulários, a rolagem interna e a navegação por teclado permanecem disponíveis.
+
+O filtro de imagem oferece "Imagem: todas", "Com imagem" e "Sem imagem". Ele envia comImagem=true/false à API (omitir inclui ambos), combina com busca/categoria/situação e retorna à primeira página ao mudar. O total e a paginação são calculados no servidor para o conjunto filtrado.
+
+A listagem exibe a miniatura cadastrada usando imagemUrl como retornada pela API, inclusive seu parâmetro de versão, sem concatenar outra interrogação. Se não houver imagem ou o carregamento falhar, aparece um ícone com identificação de ausência/indisponibilidade. A prévia de imagem já cadastrada no modal segue a mesma URL protegida. O filtro considera a referência salva no banco; ele não audita a disponibilidade física dos arquivos.
+
+Atualize e reinicie o backend antes de usar o filtro comImagem na interface.

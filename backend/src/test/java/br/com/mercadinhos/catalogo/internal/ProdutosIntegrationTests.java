@@ -369,6 +369,57 @@ class ProdutosIntegrationTests {
         assertThat(jdbc.queryForObject("SELECT permitido_para_menores FROM produtos WHERE id = ?", Boolean.class, id)).isFalse();
         assertThat(jdbc.queryForObject("SELECT categoria_id FROM produtos WHERE id = ?", Long.class, id)).isEqualTo(catA);
     }
+    @Test
+    void filtraPresencaDeImagemComTotalPaginacaoEIsolamento() throws Exception {
+        long comImagem = criarId(admin, "0001", catA);
+        long semImagem = criarId(admin, "0002", catA);
+        long inativo = criarId(admin, "0003", catA);
+        Long outraCategoria = inserir("categorias", Map.of("nome", "Outra categoria", "organizacao_id", orgA));
+        long outroProduto = criarId(admin, "0004", outraCategoria);
+        long outraOrganizacao = criarId(outroAdmin, "0005", catB);
+        for (long id : List.of(comImagem, inativo, outroProduto)) {
+            enviarImagem(admin, id, 0, png(1), "foto.png").andExpect(status().isOk());
+        }
+        enviarImagem(outroAdmin, outraOrganizacao, 0, png(1), "foto.png").andExpect(status().isOk());
+        situacao(admin, inativo, 1, false).andExpect(status().isOk());
+
+        mvc.perform(get("/api/produtos").with(user(consulta)).param("comImagem", "true").param("tamanho", "1"))
+                .andExpect(status().isOk()).andExpect(jsonPath("$.total").value(3))
+                .andExpect(jsonPath("$.itens.length()").value(1)).andExpect(jsonPath("$.itens[0].id").value(comImagem));
+        mvc.perform(get("/api/produtos").with(user(consulta)).param("comImagem", "true").param("tamanho", "1").param("pagina", "1"))
+                .andExpect(status().isOk()).andExpect(jsonPath("$.total").value(3))
+                .andExpect(jsonPath("$.itens[0].id").value(inativo));
+        mvc.perform(get("/api/produtos").with(user(consulta)).param("comImagem", "false").header("X-Organizacao-Id", orgB))
+                .andExpect(status().isOk()).andExpect(jsonPath("$.total").value(1))
+                .andExpect(jsonPath("$.itens[0].id").value(semImagem));
+        mvc.perform(get("/api/produtos").with(user(consulta)).param("comImagem", "true").param("ativo", "true")
+                        .param("categoriaId", catA.toString()).param("busca", "Produto"))
+                .andExpect(status().isOk()).andExpect(jsonPath("$.total").value(1))
+                .andExpect(jsonPath("$.itens[0].id").value(comImagem));
+        mvc.perform(get("/api/produtos").with(user(consulta))).andExpect(status().isOk()).andExpect(jsonPath("$.total").value(4));
+        mvc.perform(get("/api/produtos").param("comImagem", "true")).andExpect(status().isUnauthorized());
+        mvc.perform(get("/api/produtos").with(user(semAcesso)).param("comImagem", "false")).andExpect(status().isForbidden());
+        mvc.perform(get("/api/produtos").with(user(consulta)).param("comImagem", "talvez")).andExpect(status().isBadRequest());
+    }
+
+    @Test
+    void filtroRefleteEnvioERemocaoDeImagem() throws Exception {
+        long id = criarId(admin, "123", catA);
+        mvc.perform(get("/api/produtos").with(user(consulta)).param("comImagem", "false"))
+                .andExpect(status().isOk()).andExpect(jsonPath("$.total").value(1));
+        enviarImagem(edicao, id, 0, png(1), "foto.png").andExpect(status().isOk());
+        mvc.perform(get("/api/produtos").with(user(consulta)).param("comImagem", "true"))
+                .andExpect(status().isOk()).andExpect(jsonPath("$.total").value(1))
+                .andExpect(jsonPath("$.itens[0].imagemUrl").value("/api/produtos/" + id + "/imagem?versao=1"));
+        mvc.perform(get("/api/produtos").with(user(consulta)).param("comImagem", "false"))
+                .andExpect(status().isOk()).andExpect(jsonPath("$.total").value(0));
+        enviar(edicao, delete("/api/produtos/" + id + "/imagem").param("versao", "1"), null).andExpect(status().isOk());
+        mvc.perform(get("/api/produtos").with(user(consulta)).param("comImagem", "true"))
+                .andExpect(status().isOk()).andExpect(jsonPath("$.total").value(0));
+        mvc.perform(get("/api/produtos").with(user(consulta)).param("comImagem", "false"))
+                .andExpect(status().isOk()).andExpect(jsonPath("$.total").value(1))
+                .andExpect(jsonPath("$.itens[0].id").value(id));
+    }
     private List<Integer> concorrer(Callable<Integer> chamada) throws Exception {
         var inicio = new CountDownLatch(1);
         Callable<Integer> tarefa = () -> { inicio.await(); return chamada.call(); };

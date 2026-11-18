@@ -35,13 +35,14 @@ class ProdutosController {
     }
 
     @GetMapping
-    @Operation(summary = "Listar produtos", description = "Busca literal por nome ou código, filtro de categoria e situação. Inclui inativos se ativo não for informado.")
+    @Operation(summary = "Listar produtos", description = "Busca literal por nome ou código, filtros de categoria, situação e presença de imagem. comImagem=true inclui apenas produtos com imagem cadastrada; false inclui apenas os sem imagem. Omitir inclui ambos. Inclui inativos se ativo não for informado.")
     ProdutosService.Pagina listar(@RequestParam(defaultValue = "0") @Min(0) int pagina,
             @RequestParam(defaultValue = "20") @Min(1) @Max(100) int tamanho,
             @RequestParam(required = false) @Size(max = 200) String busca,
             @RequestParam(required = false) @Positive Long categoriaId,
-            @RequestParam(required = false) Boolean ativo) {
-        return produtos.listar(pagina, tamanho, busca, categoriaId, ativo);
+            @RequestParam(required = false) Boolean ativo,
+            @RequestParam(required = false) Boolean comImagem) {
+        return produtos.listar(pagina, tamanho, busca, categoriaId, ativo, comImagem);
     }
 
     @GetMapping("/por-codigo/{codigo}")

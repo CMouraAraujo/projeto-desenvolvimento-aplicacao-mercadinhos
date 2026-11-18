@@ -147,3 +147,9 @@ Categorias aceitam permitidoParaMenores em POST/PUT (booleano). O padrão no cad
 As respostas de categorias e produtos incluem permitidoParaMenores. Produtos recebem uma cópia da classificação da categoria ao cadastrar ou trocar categoria. O campo não é aceito como entrada no JSON de produtos. Mudanças posteriores da categoria não atualizam cópias existentes, inclusive ao salvar o produto sem trocar categoria.
 
 A V6 adiciona as colunas permitido_para_menores em categorias e produtos com padrão false e restrições de não nulo e 0/1. A V7 altera apenas os defaults para true, sem modificar classificações já salvas. Reiniciar o backend atualizado aplica as migrations. O cadastro e a edição de categorias continuam exclusivos de ADMIN; apenas a classificação fica registrada, sem verificação etária ou bloqueio de venda nesta etapa.
+
+## Filtrar produtos por presença de imagem
+
+GET /api/produtos aceita comImagem=true (somente com imagem cadastrada), comImagem=false (somente sem imagem) ou omissão (ambos). O filtro combina com busca, categoriaId e ativo, e é aplicado antes da paginação e do cálculo de total. O contexto continua vindo da organização autenticada; exige PRODUTOS/CONSULTAR.
+
+A presença é determinada pela referência imagem_chave no banco, sem ler o filesystem durante a listagem. Enviar/remover uma imagem altera os resultados na próxima consulta. O frontend deve invalidar a listagem após essas operações e usar imagemUrl como fornecida, sem anexar outro "?v=" quando a URL já contém "?versao=".

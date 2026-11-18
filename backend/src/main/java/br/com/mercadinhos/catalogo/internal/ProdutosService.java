@@ -26,9 +26,9 @@ class ProdutosService {
     record Pagina(List<ProdutoDTO> itens, int pagina, int tamanho, long total) { }
 
     public Pagina listar(@Min(0) int pagina, @Min(1) @Max(100) int tamanho,
-            @Size(max = 200) String busca, @Positive Long categoriaId, Boolean ativo) {
+            @Size(max = 200) String busca, @Positive Long categoriaId, Boolean ativo, Boolean comImagem) {
         acesso.exigir(Modulo.PRODUTOS, Acao.CONSULTAR);
-        var resultado = produtos.listar(acesso.organizacaoId(), ativo, categoriaId, NomesCategoria.filtroLiteral(busca),
+        var resultado = produtos.listar(acesso.organizacaoId(), ativo, categoriaId, NomesCategoria.filtroLiteral(busca), comImagem,
                 PageRequest.of(pagina, tamanho, Sort.by("nome").ascending().and(Sort.by("id"))));
         return new Pagina(resultado.stream().map(mapper::resposta).toList(), pagina, tamanho, resultado.getTotalElements());
     }

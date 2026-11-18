@@ -122,7 +122,7 @@ function ProdutoEditor({ initial, categorias, opcoes, onClose, onSaved }: Props 
             {!categorias.some(c => c.ativa) && !current && <div className="notice">Cadastre uma categoria ativa antes de criar um produto. A manutenção de categorias é exclusiva do administrador.</div>}
             <div className="image-section"><div><h3>Imagem do produto</h3><p>PNG ou JPEG · até {Math.round(opcoes.imagemMaxBytes / 1024 / 1024)} MiB</p></div>
               {(previewUrl || current?.imagemUrl) && <img className="image-preview"
-                src={previewUrl ?? (current!.imagemUrl + '?v=' + current!.versao)}
+                src={previewUrl ?? current?.imagemUrl ?? undefined}
                 alt={previewUrl ? 'Prévia da imagem selecionada' : current!.nome}/>}
               {!readOnly && can('EDITAR') && <><label className="upload"><Icon name="image"/><span>{arquivo ? arquivo.name : 'Selecionar imagem'}</span><input aria-label="Selecionar imagem" type="file" accept={opcoes.formatosImagem.join(',')} disabled={busy || imagePending} onChange={async event => {
                 const file = event.target.files?.[0]

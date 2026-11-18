@@ -389,3 +389,9 @@ O backend copia a classificação da categoria da própria organização ao cria
 A checkbox "Proibida para menores de 18 anos" está nos modais de criar/editar categoria, inclusive no cadastro de produto. Ela começa desmarcada (livre, permitidoParaMenores=true); marcada significa restrita (permitidoParaMenores=false). Atualize e reinicie o backend para aplicar as migrations V6/V7 antes de usar a interface atualizada. Não é necessário apagar o banco nem recriar as contas.
 
 Essa informação é preparatória: ainda não há verificação de idade nem bloqueio de vendas. A classificação dos dados existentes deve ser revisada antes de implementar qualquer regra de venda baseada nela.
+
+## Filtro e miniaturas de imagens no catálogo
+
+GET /api/produtos aceita comImagem=true/false, combinável com busca, categoria e situação. Omitir esse parâmetro inclui produtos com e sem imagem. O total e a paginação respeitam o filtro e a organização da sessão. A presença é determinada pela referência de imagem no banco.
+
+No painel, o seletor de imagem retorna à primeira página ao mudar. Produtos com imagem mostram sua miniatura; os demais exibem um ícone. Falhas de carregamento são identificadas como imagem indisponível. Reinicie o backend atualizado para habilitar o parâmetro na aplicação em execução; não há migration nova para este ajuste.
